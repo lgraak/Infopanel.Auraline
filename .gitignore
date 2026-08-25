@@ -1,0 +1,51 @@
+# .NET build output
+[Bb]in/
+[Oo]bj/
+[Aa]rtifacts/
+[Pp]ublish/
+*.binlog
+
+# Visual Studio and MSBuild user state
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.csproj.user
+
+# JetBrains Rider/ReSharper
+.idea/
+*.sln.iml
+_ReSharper*/
+*.DotSettings.user
+
+# Test and coverage output
+[Tt]est[Rr]esult*/
+[Tt]est[Rr]esults/
+coverage/
+coverage.*
+*.coverage
+*.coveragexml
+
+# NuGet and local tooling
+*.nupkg
+*.snupkg
+packages/
+.packages/
+.nuget/
+.dotnet/
+
+# Logs, diagnostics, and temporary files
+logs/
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.userprefs
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
