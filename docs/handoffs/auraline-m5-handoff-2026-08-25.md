@@ -2,12 +2,13 @@
 
 Date: 2026-08-25T15:07:57.4744488-07:00
 Acceptance completed: 2026-08-25T15:32:44.8873680-07:00
-Status: completed and ready for publication
+Publication reconciliation: 2026-08-25T15:35:10.0929928-07:00
+Status: completed and published; this evidence-only reconciliation follows the published M5 checkpoint
 Model: GPT-5 Codex
 Effort: High
 Repository: InfoPanel.Auraline (`D:\Aeons\Git\Infopanel.Auraline`)
 Branch: `main`
-HEAD: `1cdb65b2ee07b51d46c4e7a8719686948007c687` (published M4 checkpoint before the M5 commit)
+HEAD: `0151a7b957776be53026c297ccfbb65fcf1aa765` (published M5 checkpoint; this reconciliation follows it)
 Authoritative remote: `origin` at `https://github.com/lgraak/Infopanel.Auraline.git`
 
 > This handoff is a continuation checkpoint, not authoritative truth. Current
@@ -56,8 +57,14 @@ remain excluded.
   divergence `0 0` before M5 changes.
 - Working tree: only intended M5 implementation, tests, documentation, and this
   handoff are present; no unrelated user changes were found.
-- Commit and push/readback: pending the scoped publication step immediately after
-  this handoff's final validation.
+- Commit `0151a7b957776be53026c297ccfbb65fcf1aa765` records the complete M5
+  implementation, tests, documentation, and acceptance handoff.
+- A fresh pre-push fetch confirmed `origin/main` remained at
+  `1cdb65b2ee07b51d46c4e7a8719686948007c687`, local divergence `0 1`, and
+  valid fast-forward ancestry. A normal push published M5.
+- Post-push fetch and independent `ls-remote` readback returned
+  `0151a7b957776be53026c297ccfbb65fcf1aa765` for local HEAD, tracking
+  `origin/main`, and authoritative `refs/heads/main`; divergence was `0 0`.
 - Authoritative remote was freshly fetched at preflight and remained the M4
   checkpoint. No merge, rebase, reset, stash, clean, or history rewrite occurred.
 
@@ -161,6 +168,12 @@ remain excluded.
 
 - Fresh fetch and preflight: clean `main`, local/origin divergence `0 0`, exact
   starting HEAD `1cdb65b2ee07b51d46c4e7a8719686948007c687`.
+- Publication: staged diff check passed for 32 intended files; commit
+  `0151a7b957776be53026c297ccfbb65fcf1aa765` was pushed by normal fast-forward.
+  Fresh fetch plus `ls-remote` matched that SHA with numeric divergence `0 0`.
+  An initial post-push assertion falsely failed by comparing PowerShell's
+  tab-formatted display string; the SHA values were already identical, and the
+  corrected numeric assertion passed.
 - `dotnet restore InfoPanel.Auraline.sln --configfile NuGet.Config`: passed after
   narrow managed access to the user NuGet configuration.
 - Debug and Release solution builds: passed with 0 errors and three established
@@ -209,9 +222,12 @@ remain excluded.
 
 ## Production State Versus Repository State
 
-- Implemented: bounded M5 repository behavior is complete in the working tree.
-- Committed: pending the publication step after this handoff's final validation.
-- Pushed: pending the authorized normal fast-forward publication.
+- Implemented: bounded M5 repository behavior is complete.
+- Committed: `0151a7b957776be53026c297ccfbb65fcf1aa765`; this publication
+  reconciliation is a separate evidence-only commit.
+- Pushed: M5 is published through
+  `0151a7b957776be53026c297ccfbb65fcf1aa765` with authoritative divergence
+  `0 0` before this reconciliation.
 - Deployed or activated: the M5 Host Release binary and local per-user M5
   configuration are active. The exact M5 four-file InfoPanel package is active
   locally with a verified rollback backup.
