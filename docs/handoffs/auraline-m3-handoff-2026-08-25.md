@@ -1,12 +1,12 @@
 # Auraline M3 Render Sessions and Windows Local Frame Transport Handoff
 
-Date: 2026-08-25T10:28:27.101-07:00
-Status: completed; publication pending at initial handoff creation
+Date: 2026-08-25T10:34:06.324-07:00
+Status: completed and published
 Model: GPT-5 Codex
 Effort: High
 Repository: InfoPanel.Auraline (`D:\Aeons\Git\Infopanel.Auraline`)
 Branch: `main`
-HEAD: `61deaea4d009bd70f2d1a18f3c044940fc05039f` before the pending M3 commit
+HEAD: `4a4ba9673573f15efd4afcccb272b0415637d24e` (published M3 implementation checkpoint)
 Authoritative remote: `origin` at `https://github.com/lgraak/Infopanel.Auraline.git`
 
 > This handoff is a continuation checkpoint, not authoritative truth. Current
@@ -60,14 +60,18 @@ profile management remain excluded.
 - Working tree before M3: clean.
 - Upstream: `origin/main`; authoritative fetch completed successfully and fresh
   divergence was `0 0` at the preflight SHA.
-- Commit and authoritative remote readback: pending at initial handoff creation;
-  this section must be reconciled after publication.
+- Commit: `4a4ba9673573f15efd4afcccb272b0415637d24e`
+  (`Build Auraline render-session transport`).
+- Authoritative remote readback: `git fetch`, `origin/main`, and
+  `git ls-remote origin refs/heads/main` all returned the same full SHA;
+  divergence was `0 0` and the post-push working tree was clean.
 - Preserved unrelated changes: none were present; the working tree contains only
   intended M3 implementation, tests, documentation, and this handoff.
 
 ## Current Known-Good State
 
-- The final working tree passed restore, Debug/Release builds, 57 tests, format
+- Published M3 implementation commit `4a4ba9673573f15efd4afcccb272b0415637d24e`
+  passed restore, Debug/Release builds, 57 tests, format
   verification, Gitleaks, Markdown-link validation, portability checks, and
   `git diff --check` on 2026-08-25.
 - Resonance Signal returned protocol v1 ready on `127.0.0.1:48480`; Auraline Host
@@ -186,9 +190,9 @@ profile management remain excluded.
 - Portability source checks: passed as part of the 57-test suite; Windows-only types
   are absent from waveform, shared contracts, and render-session domain sources.
 - `gitleaks dir . --no-banner --redact`: passed; about 1.09 MB scanned, no leaks.
-- Repository-relative Markdown link checker: passed across 24 Markdown files before
-  handoff creation; it will be rerun with this handoff before commit.
-- `git diff --check`: passed before handoff creation and will be rerun staged.
+- Repository-relative Markdown link checker: passed across all 25 Markdown files,
+  including this handoff.
+- `git diff --check` and staged `git diff --cached --check`: passed.
 - Static transport inspection found no waveform/audio sample fields or persistence
   in shared contracts, session manager, or Windows mapping implementation; the
   mapping contains only rendered-frame metadata and pixels.
@@ -223,9 +227,12 @@ profile management remain excluded.
 
 ## Production State Versus Repository State
 
-- Implemented: complete M3 working-tree behavior described above.
-- Committed: pending at initial handoff creation.
-- Pushed: pending at initial handoff creation.
+- Implemented: complete M3 behavior described above at
+  `4a4ba9673573f15efd4afcccb272b0415637d24e`.
+- Committed: implementation, tests, probe, documentation, and initial handoff in
+  `4a4ba9673573f15efd4afcccb272b0415637d24e`.
+- Pushed: authoritative `origin/main` read back at the same SHA with divergence
+  `0 0`.
 - Deployed or activated: no production deployment exists; two temporary local Host
   runs were used only for acceptance and then stopped.
 - Runtime-validated: real Resonance provider, Host, loopback API, separate probe,
@@ -244,7 +251,6 @@ profile management remain excluded.
   storage/editing.
 - The performance observations are local sanity data, not formal or cross-machine
   benchmarks.
-- Publication/readback fields remain to be reconciled after commit and push.
 
 ## Safety, Rollback, and Access Considerations
 
