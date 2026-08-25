@@ -1,5 +1,7 @@
 # InfoPanel.Auraline
 
+![Auraline product mark](assets/branding/auraline-mark.png)
+
 InfoPanel.Auraline turns portable audio data from [Resonance Signal](https://github.com/lgraak/resonance-signal) into Host-rendered visuals for InfoPanel. Resonance Signal remains the provider, Auraline Host owns configuration, waveform processing, rendering, and diagnostics, and the InfoPanel plugin remains a thin consumer adapter.
 
 Auraline is currently `0.1.0-beta.1` for Windows x64. M6 adds first-class diagnostics, an isolated Host self-test, safe Markdown/ZIP evidence export, temporary Debug logging, and a reproducible combined beta package. Public distribution remains gated on a compatible InfoPanel build containing the generic image consumer-dimension capability used by this plugin.

@@ -8,6 +8,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationIcon>..\..\assets\branding\generated\auraline.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,6 +17,11 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Auraline.Host.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\assets\branding\generated\auraline-tray.ico" LogicalName="Auraline.Host.Branding.auraline-tray.ico" />
+    <EmbeddedResource Include="..\..\assets\branding\generated\auraline-mark-96.png" LogicalName="Auraline.Host.Branding.auraline-mark-96.png" />
   </ItemGroup>
 
   <ItemGroup>

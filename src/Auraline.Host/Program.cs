@@ -155,6 +155,7 @@ public static class Program
         app.MapRenderSessionEndpoints();
         app.MapDiagnosticsEndpoints();
         app.MapGet("/health", (HostStatusService status) => Results.Json(status.GetHealth()));
+        app.MapGet("/assets/auraline-mark.png", () => Results.File(BrandingAssets.MarkPng, "image/png"));
         app.MapGet("/waveform/preview.png", (HttpResponse response, IWaveformEngineStatusProvider waveform, WaveformRenderer renderer) =>
         {
             response.Headers.CacheControl = "no-store";

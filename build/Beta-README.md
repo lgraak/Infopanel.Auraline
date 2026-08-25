@@ -1,6 +1,10 @@
 # Auraline 0.1.0-beta.1 for Windows x64
 
+![Auraline product mark](Branding/auraline-mark.png)
+
 Auraline turns local Resonance Signal waveform data into Host-rendered images for InfoPanel. This is a prerelease beta; updates and removal are manual.
+
+The Auraline artwork is project-owned, user-supplied artwork. The Host executable and tray icon embed generated derivatives; the packaged mark is included only for these instructions.
 
 ## Requirements
 

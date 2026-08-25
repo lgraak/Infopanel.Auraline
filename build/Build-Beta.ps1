@@ -11,10 +11,12 @@ $staging = Join-Path $repo "dist\Auraline-$version-$Runtime"
 $archive = "$staging.zip"
 $hostDir = Join-Path $staging 'Host'
 $pluginDir = Join-Path $staging 'InfoPanel.Plugin\InfoPanel.Auraline'
+$brandingDir = Join-Path $staging 'Branding'
 
 if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
 if (Test-Path -LiteralPath $archive) { Remove-Item -LiteralPath $archive -Force }
-New-Item -ItemType Directory -Path $hostDir,$pluginDir | Out-Null
+& (Join-Path $PSScriptRoot 'Build-Branding.ps1')
+New-Item -ItemType Directory -Path $hostDir,$pluginDir,$brandingDir | Out-Null
 
 dotnet restore (Join-Path $repo 'src\Auraline.Host\Auraline.Host.csproj') --runtime $Runtime --configfile (Join-Path $repo 'NuGet.Config')
 if ($LASTEXITCODE -ne 0) { throw 'Host restore failed.' }
@@ -29,6 +31,7 @@ $actualPluginFiles = @(Get-ChildItem -LiteralPath $pluginSource -File | Sort-Obj
 if (Compare-Object $expectedPluginFiles $actualPluginFiles) { throw "Plugin package contents do not match the four-file contract: $($actualPluginFiles -join ', ')" }
 Copy-Item -Path (Join-Path $pluginSource '*') -Destination $pluginDir
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Beta-README.md') -Destination (Join-Path $staging 'README.md')
+Copy-Item -LiteralPath (Join-Path $repo 'assets\branding\generated\auraline-mark-256.png') -Destination (Join-Path $brandingDir 'auraline-mark.png')
 
 $manifest = Get-ChildItem -LiteralPath $staging -Recurse -File |
     Where-Object Name -ne 'checksums.txt' |
