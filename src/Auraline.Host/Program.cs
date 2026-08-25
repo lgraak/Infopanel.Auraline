@@ -1,5 +1,6 @@
 using Auraline.Contracts;
 using Auraline.Host.Configuration;
+using Auraline.Host.Diagnostics;
 using Auraline.Host.Lifecycle;
 using Auraline.Host.Waveform;
 using Auraline.Host.Platform;
@@ -9,6 +10,7 @@ using Auraline.Host.RenderSessions;
 using Auraline.Host.Web;
 using Serilog;
 using Serilog.Events;
+using Serilog.Core;
 using System.Globalization;
 using System.Text.Json.Serialization;
 
@@ -30,8 +32,9 @@ public static class Program
         IPlatformPaths platformPaths = new WindowsPlatformPaths();
         var paths = platformPaths.GetPaths();
         paths.EnsureDirectories();
+        var logLevelSwitch = new LoggingLevelSwitch(LogEventLevel.Information);
         Log.Logger = new LoggerConfiguration()
-            .MinimumLevel.Information()
+            .MinimumLevel.ControlledBy(logLevelSwitch)
             .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
             .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
             .MinimumLevel.Override("System.Net.Http.HttpClient", LogEventLevel.Warning)
@@ -56,6 +59,11 @@ public static class Program
             builder.Host.UseSerilog();
             builder.WebHost.UseUrls($"http://127.0.0.1:{configuration.Current.Host.Port}");
             builder.Services.AddSingleton(paths);
+            builder.Services.AddSingleton(logLevelSwitch);
+            builder.Services.AddSingleton<DiagnosticLogLevel>();
+            builder.Services.AddSingleton<DiagnosticsRedactor>();
+            builder.Services.AddSingleton<IWaveformSelfTester, WaveformSelfTestClient>();
+            builder.Services.AddSingleton<DiagnosticsService>();
             builder.Services.AddSingleton(configuration);
             builder.Services.AddSingleton(products);
             builder.Services.AddSingleton<IProfileCatalog>(products);
@@ -145,6 +153,7 @@ public static class Program
     {
         app.MapConfigurationEndpoints();
         app.MapRenderSessionEndpoints();
+        app.MapDiagnosticsEndpoints();
         app.MapGet("/health", (HostStatusService status) => Results.Json(status.GetHealth()));
         app.MapGet("/waveform/preview.png", (HttpResponse response, IWaveformEngineStatusProvider waveform, WaveformRenderer renderer) =>
         {
@@ -168,7 +177,7 @@ public static class Program
             Results.Content(UiRenderer.Profiles(products, sessions, providers.GetStatuses(), config.Current.Host.Theme), "text/html"));
         app.MapGet("/profiles/{profileId}/edit", (string profileId, ProductConfigurationStore products, ConfigurationStore config) =>
             Html(() => UiRenderer.ProfileEditor(products.GetProfile(profileId), products.GetGroups(), config.Current.Host.Theme), config.Current.Host.Theme, "/profiles"));
-        app.MapGet("/diagnostics", (HostStatusService status, ProductConfigurationStore products, ConfigurationStore config) => Results.Content(UiRenderer.Diagnostics(status.GetHealth(), products, config.Current.Host.Theme), "text/html"));
+        app.MapGet("/diagnostics", (DiagnosticsService diagnostics, ConfigurationStore config) => Results.Content(UiRenderer.Diagnostics(diagnostics.GetSnapshot(), config.Current.Host.Theme), "text/html"));
 
         app.MapPost("/providers", async (HttpRequest request, ProviderManager providers, ConfigurationStore config) =>
         {

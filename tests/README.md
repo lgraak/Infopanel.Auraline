@@ -8,4 +8,6 @@ M4 adds `InfoPanel.Auraline.Tests` for the real plugin boundary: lifecycle defau
 
 M5 adds Host tests for product bootstrap/migration, atomic persistence, malformed-file preservation, source resolution and stale evidence, profile/source-group CRUD, duplicate/default/dependency behavior, configuration APIs, profile-aware attach rejection, revisioned hot apply, fixed scale, smoothing, and real-renderer preview inputs. Plugin coverage also verifies that configuration choices refresh from the Host while retaining stable IDs and fail safely to the current choice.
 
+M6 adds diagnostics tests for deterministic identifier/secret redaction, temporary Info/Debug switching, stable major error categories, coherent prerelease version exposure, and beta-package guardrails. Package acceptance separately verifies the framework-dependent Host, exact four-file plugin boundary, checksum manifest, and combined archive.
+
 `Auraline.TransportProbe` is a separate executable rather than an in-process unit test. With Host running, it negotiates through `/api/v1`, opens the returned Windows mapping, validates the RGBA8888-premultiplied geometry, observes sequence and pixel advancement, heartbeats for longer runs, and detaches. Pass `--profile-id <stable-id>` to exercise a saved M5 profile or `--abrupt` to leave lease cleanup to expiry. It is not the InfoPanel plugin.

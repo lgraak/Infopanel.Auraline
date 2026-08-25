@@ -85,7 +85,8 @@ public sealed class WaveformEngineService(
                 _averageRenderDurationMs,
                 DefaultTargetFps,
                 _retryState ?? WaveformRetryHint.Unknown.ToString(),
-                _renderedFrames);
+                _renderedFrames,
+                _lastError);
         }
     }
 

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using Auraline.Host.Configuration;
+using Auraline.Host.Diagnostics;
 using Auraline.Host.Providers;
 using Auraline.Host.RenderSessions;
 
@@ -127,8 +128,32 @@ public static class UiRenderer
     public static string Placeholder(string title, string milestone, string theme) =>
         Page(title, theme, $"<h1>{E(title)}</h1><section><p>{E(title)} functionality arrives in {E(milestone)}. This navigation entry establishes the intended product shape only.</p></section>");
 
-    public static string Diagnostics(HealthContract health, ProductConfigurationStore products, string theme) =>
-        Page("Diagnostics", theme, $"<h1>Diagnostics</h1><p>Host version: <strong>{E(health.HostVersion)}</strong></p><p>Health: <strong>{E(health.HostStatus)}</strong></p><p><a href=/health>Machine-readable health API</a></p><section><h2>Persistent configuration</h2><ul><li>Product schema: {ProductCatalogDocument.CurrentSchemaVersion}</li><li>Profiles: {products.GetProfiles().Count}; default <code>{E(products.Catalog.DefaultProfileId)}</code></li><li>Source groups: {products.GetGroups().Count}; default <code>{E(products.Catalog.DefaultSourceGroupId)}</code></li><li>Last-known sources: {products.SourceCatalog.Sources.Count}; refreshed {E(products.SourceCatalog.RefreshedAtUtc?.ToString("O") ?? "never")}</li><li>Validation failures: {products.ValidationFailureCount}; save failures: {products.SaveFailureCount}</li></ul>{Error(products.LoadError)}</section>{WaveformCard(health.Waveform)}{RenderSessionsCard(health.RenderSessions)}<p>Rolling charts and diagnostic export remain M6 work.</p>");
+    public static string Diagnostics(DiagnosticsSnapshot snapshot, string theme)
+    {
+        var health = snapshot.Health;
+        var providerRows = string.Join("", snapshot.Providers.Select(provider => $"<tr><td>{E(provider.FriendlyName)}</td><td><code>{E(provider.Endpoint)}</code></td><td>{E(provider.State.ToString())}</td><td>{provider.Sources.Count}</td><td>{provider.ReconnectCount}</td><td>{(provider.RetryDelayMs is null ? "—" : $"{provider.RetryDelayMs:F0} ms")}</td><td>{E(provider.LastError ?? "—")}</td></tr>"));
+        var sourceRows = string.Join("", snapshot.Providers.SelectMany(provider => provider.Sources).Select(source => $"<tr><td>{E(source.DisplayName ?? source.SourceId)}</td><td>{E(source.Availability)}</td><td>{E(source.ProviderId)}</td><td>{(source.DefaultPlayback ? "Default Playback" : "Explicit")}</td></tr>"));
+        var groupRows = string.Join("", snapshot.SourceGroups.Select(group => $"<tr><td>{E(group.Group.FriendlyName)}</td><td><code>{E(group.Group.Id)}</code></td><td>{E(group.Availability)}</td><td>{group.Members.Count(item => item.Resolution is SourceMemberResolution.Unresolved or SourceMemberResolution.Ambiguous)}</td></tr>"));
+        var profileRows = string.Join("", snapshot.Profiles.Select(profile => $"<tr><td>{E(profile.FriendlyName)}</td><td><code>{E(profile.Id)}</code></td><td>r{profile.Revision}</td><td>{profile.Waveform.TargetFps}</td></tr>"));
+        var selfTest = snapshot.LatestSelfTest is null
+            ? "<p>Not run during this Host session.</p>"
+            : $"<p><strong>{E(snapshot.LatestSelfTest.OverallResult)}</strong> in {snapshot.LatestSelfTest.DurationMs} ms ({E(snapshot.LatestSelfTest.EndedAtUtc.ToString("O"))})</p><table><tbody>{string.Join("", snapshot.LatestSelfTest.Stages.Select(stage => $"<tr><td>{E(stage.Name)}</td><td>{E(stage.Status.ToString())}</td><td>{E(stage.Reason)}</td><td>{stage.DurationMs} ms</td></tr>"))}</tbody></table>";
+        return Page("Diagnostics", theme, $$$"""
+        <h1>Diagnostics</h1><p>Current-run evidence for beta troubleshooting. <a href=/health>Concise health API</a> · <a href=/api/v1/diagnostics>Diagnostics API</a></p>
+        <section><h2>Beta Readiness</h2><ul><li>Host: <strong>{{{E(snapshot.HostVersion)}}}</strong> ({{{E(snapshot.ReleaseChannel)}}})</li><li>Health: {{{E(health.HostStatus)}}}</li><li>Provider health: {{{health.ProviderSummary.Connected}}}/{{{health.ProviderSummary.Enabled}}} enabled connected</li><li>Waveform health: {{{E(health.Waveform?.VisualState ?? "unavailable")}}}</li><li>InfoPanel compatibility: contract {{{snapshot.ContractVersion}}}; plugin version is visible inside InfoPanel when connected</li></ul><p class=error>{{{E(snapshot.ExternalReleaseGate)}}}</p></section>
+        <section><h2>Build / Versions</h2><ul><li>Auraline Host: {{{E(snapshot.HostVersion)}}}</li><li>Host/plugin contract: {{{snapshot.ContractVersion}}}</li><li>Resonance Signal protocol: {{{snapshot.ResonanceSignalProtocolVersion}}}</li><li>OS: {{{E(snapshot.OperatingSystem)}}}</li><li>Runtime: {{{E(snapshot.Runtime)}}}; {{{E(snapshot.Architecture)}}}</li></ul></section>
+        <section><h2>Providers</h2><div class=table-wrap><table><thead><tr><th>Name</th><th>Endpoint</th><th>State</th><th>Sources</th><th>Reconnects</th><th>Backoff</th><th>Last error</th></tr></thead><tbody>{{{providerRows}}}</tbody></table></div></section>
+        <section><h2>Sources</h2><div class=table-wrap><table><thead><tr><th>Source</th><th>Availability</th><th>Provider</th><th>Intent</th></tr></thead><tbody>{{{sourceRows}}}</tbody></table></div></section>
+        <section><h2>Source Groups</h2><div class=table-wrap><table><thead><tr><th>Name</th><th>ID</th><th>Availability</th><th>Unresolved</th></tr></thead><tbody>{{{groupRows}}}</tbody></table></div></section>
+        <section><h2>Profiles</h2><div class=table-wrap><table><thead><tr><th>Name</th><th>ID</th><th>Revision</th><th>FPS</th></tr></thead><tbody>{{{profileRows}}}</tbody></table><p>Schema {{{ProductCatalogDocument.CurrentSchemaVersion}}}; validation failures {{{health.ProductConfiguration?.ValidationFailureCount ?? 0}}}; save failures {{{health.ProductConfiguration?.SaveFailureCount ?? 0}}}.</p></div></section>
+        {{{WaveformCard(health.Waveform)}}}{{{RenderSessionsCard(health.RenderSessions)}}}
+        <section><h2>InfoPanel Consumers</h2><p>Active consumer leases: {{{health.RenderSessions?.TotalConsumerLeases ?? 0}}}. Session IDs, dimensions, cadence, sequence, frame age, and errors are shown above and in InfoPanel's Auraline diagnostics entries. No additional polling is performed.</p></section>
+        <section><h2>Logging</h2><p>Current level: <strong>{{{E(snapshot.LogLevel)}}}</strong>. Debug is temporary and resets to Info when Host restarts. Files roll at 10 MiB with seven retained.</p><form method=post action=/api/v1/diagnostics/log-level><button name=level value=Info>Info</button><button name=level value=Debug>Debug</button></form></section>
+        <section><h2>Self-Test</h2>{{{selfTest}}}<form method=post action=/diagnostics/self-test><button>Run Host self-test</button></form><p class=small>The isolated test never uses an active consumer lease or changes saved configuration.</p></section>
+        <section><h2>Export</h2><button type=button onclick="copySummary()">Copy diagnostics summary</button> <form class=inline method=post action=/api/v1/diagnostics/export><button>Export diagnostics</button></form><p class=small>No audio samples, waveform samples, or frame pixels are exported. Obvious usernames, profile paths, hostnames, and secret-like values are redacted. Technical provider, endpoint, source, and profile names may remain.</p><pre id=copyStatus></pre></section>
+        <script>async function copySummary(){const r=await fetch('/api/v1/diagnostics/summary');const t=await r.text();await navigator.clipboard.writeText(t);document.querySelector('#copyStatus').textContent='Diagnostics summary copied.'}</script>
+        """);
+    }
 
     private static string ProviderTable(IReadOnlyList<ProviderHealthContract> providers) =>
         "<table><thead><tr><th>Name</th><th>Enabled</th><th>State</th><th>Sources</th><th>Last reason</th></tr></thead><tbody>" +

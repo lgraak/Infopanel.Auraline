@@ -26,7 +26,7 @@ public sealed class RenderSessionApiTests
 
         Assert.NotNull(catalog);
         Assert.Equal(ContractVersion.Current, catalog.ContractVersion);
-        Assert.Equal("1.0.0-m5", catalog.HostVersion);
+        Assert.Equal("0.1.0-beta.1", catalog.HostVersion);
         var profile = Assert.Single(catalog.Profiles);
         Assert.Equal(AuralineProfiles.DefaultProfileId, profile.ProfileId);
         Assert.Equal("Default Waveform", profile.FriendlyName);

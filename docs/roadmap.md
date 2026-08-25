@@ -10,7 +10,7 @@ This roadmap distinguishes shipped milestone scope from deferred intent. M4 is t
 - [x] M3: Render-session and IPC layer
 - [x] M4: InfoPanel.Auraline end-to-end integration
 - [x] M5: Host configuration UI and persistent profiles
-- [ ] M6: Diagnostics and beta readiness
+- [x] M6: Diagnostics and beta readiness
 
 ## Milestones
 
@@ -47,7 +47,9 @@ The persistent model accepts explicit-source, multi-source, and cross-provider g
 
 ### M6: Diagnostics and beta readiness
 
-Add actionable health reporting, secret-safe diagnostics, packaging readiness, and the operational evidence needed for a small beta. Reconcile documentation and installer behavior with the system that actually exists.
+M6 formalizes the loopback `/api/v1/diagnostics` surface while keeping `/health` concise. The Host exposes build/runtime/provider/source/profile/waveform/session state, temporary Info/Debug control, a bounded current-run isolated self-test, redacted Markdown summary, and user-initiated ZIP export with bounded logs and no audio/sample/pixel payloads.
+
+Host and plugin now use coherent `0.1.0-beta.1` prerelease versioning. A repeatable PowerShell target builds a framework-dependent Windows x64 Host plus the exact M4 four-file plugin, tester README, and SHA-256 manifest into one combined ZIP. Public distribution remains gated on shipping the separate InfoPanel consumer-dimension prerequisite.
 
 ## Intended beta flow
 
@@ -90,7 +92,7 @@ These ideas are intentionally retained without expanding the initial proof:
 
 ### Operations and consumers
 
-- short rolling diagnostic history and sparklines;
+- rolling diagnostic history and sparklines;
 - LAN Host access, gated on authentication and TLS design;
 - generic web, browser, and OBS-style consumers;
 - network frame transport;

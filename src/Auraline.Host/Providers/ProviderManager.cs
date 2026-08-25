@@ -189,6 +189,7 @@ public sealed class ProviderManager : IHostedService, IDisposable
                 var error = ConciseError(ex);
                 runtime.SetState(ProviderLifecycleState.Reconnecting, error);
                 var retryDelay = backoff.NextDelay();
+                runtime.RecordReconnect(retryDelay);
                 consecutiveFailures++;
                 if (consecutiveFailures <= 4 || (consecutiveFailures - 4) % 12 == 0)
                     _logger.LogWarning("Provider {ProviderId} unavailable ({Reason}); retrying in {RetryDelay}", runtime.Configuration.Id, error, retryDelay);
@@ -241,6 +242,8 @@ public sealed class ProviderManager : IHostedService, IDisposable
         private IReadOnlyList<ProviderSource> _sources = [];
         private CancellationTokenSource? _cancellation;
         private Task? _task;
+        private long _reconnectCount;
+        private TimeSpan? _retryDelay;
 
         public Runtime(ProviderConfiguration configuration)
         {
@@ -288,7 +291,13 @@ public sealed class ProviderManager : IHostedService, IDisposable
                 _lastConnectedAt = DateTimeOffset.UtcNow;
                 _revision = result.DiscoveryRevision;
                 _sources = result.Sources;
+                _retryDelay = null;
             }
+        }
+
+        public void RecordReconnect(TimeSpan retryDelay)
+        {
+            lock (_gate) { _reconnectCount++; _retryDelay = retryDelay; }
         }
 
         public void UpdateSourceMetadata(string sourceId, int channelCount, int sampleRateHz)
@@ -318,7 +327,8 @@ public sealed class ProviderManager : IHostedService, IDisposable
         public ProviderStatus Snapshot()
         {
             lock (_gate) return new(_configuration.Id, _configuration.FriendlyName, _configuration.Endpoint,
-                _configuration.Enabled, _state, _lastError, _lastConnectedAt, _revision, _sources.ToArray());
+                _configuration.Enabled, _state, _lastError, _lastConnectedAt, _revision, _sources.ToArray(),
+                _reconnectCount, _retryDelay?.TotalMilliseconds);
         }
 
         public void Dispose() => _cancellation?.Dispose();

@@ -78,7 +78,8 @@ public sealed record WaveformEngineHealth(
     [property: JsonPropertyName("average_render_duration_ms")] double? AverageRenderDurationMs,
     [property: JsonPropertyName("target_fps")] int TargetFps,
     [property: JsonPropertyName("retry_state")] string RetryState,
-    [property: JsonPropertyName("rendered_frames")] long RenderedFrames);
+    [property: JsonPropertyName("rendered_frames")] long RenderedFrames,
+    [property: JsonPropertyName("last_error")] string? LastError = null);
 
 public sealed record WaveformRenderedFrame(
     [property: JsonPropertyName("width")] int Width,

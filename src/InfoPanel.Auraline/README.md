@@ -1,6 +1,6 @@
 # InfoPanel.Auraline plugin
 
-This project is the thin Windows InfoPanel adapter for Auraline M5. It owns InfoPanel lifecycle/configuration, profile discovery, render-session leases, latest-frame consumption, and InfoPanel image publication. Resonance Signal consumption, waveform processing, rendering, profile revisions, color, smoothing, and idle-state visuals remain entirely in Auraline Host.
+This project is the thin Windows InfoPanel adapter for Auraline `0.1.0-beta.1`. It owns InfoPanel lifecycle/configuration, profile discovery, render-session leases, latest-frame consumption, and InfoPanel image publication. Resonance Signal consumption, waveform processing, rendering, profile revisions, color, smoothing, self-test, and Host diagnostics export remain entirely in Auraline Host.
 
 ## Source layout
 
@@ -32,4 +32,6 @@ InfoPanel sends replacement demand snapshots. For one output, the plugin selects
 
 When InfoPanel reads the plugin configuration properties, M5 performs a short bounded loopback catalog refresh. Friendly profile names are presented while the stored value retains the stable profile ID in brackets. Failure keeps the existing/fallback choice and never substitutes an unrelated profile. A Host-side profile save hot-applies through the existing session; the plugin does not renegotiate or rerender.
 
-The Release M5 package is built and repository-tested. Local activation requires backing up and replacing only the four files in the Auraline plugin folder, then reloading the module or restarting InfoPanel. The required InfoPanel consumer-demand prerequisite remains a local unpublished checkpoint.
+The Release beta package is built and repository-tested. Local activation requires backing up and replacing only the four files in the Auraline plugin folder, then reloading the module or restarting InfoPanel. Do not copy `InfoPanel.Plugins.dll`, `InfoPanel.Plugins.Graphics.dll`, `SkiaSharp.dll`, or `libSkiaSharp.dll`; InfoPanel owns those assemblies. The required InfoPanel consumer-demand prerequisite remains a local unpublished checkpoint and an external distribution gate.
+
+Plugin-side diagnostics remain low-volume InfoPanel entries: plugin/Host version and contract, selected profile, active session IDs and dimensions, frame sequence/age, reconnect count, and last error. M6 does not add Host polling solely for consumer metrics or change the M4 transport.

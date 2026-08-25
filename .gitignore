@@ -2,6 +2,7 @@
 [Bb]in/
 [Oo]bj/
 [Aa]rtifacts/
+[Dd]ist/
 [Pp]ublish/
 src/InfoPanel.Auraline/references/*.dll
 src/InfoPanel.Auraline/references/*.pdb

@@ -29,7 +29,9 @@ public sealed record ProviderStatus(
     string? LastError,
     DateTimeOffset? LastConnectedAt,
     string? DiscoveryRevision,
-    IReadOnlyList<ProviderSource> Sources);
+    IReadOnlyList<ProviderSource> Sources,
+    long ReconnectCount = 0,
+    double? RetryDelayMs = null);
 
 public sealed record ProviderConnectionResult(string DiscoveryRevision, IReadOnlyList<ProviderSource> Sources);
 

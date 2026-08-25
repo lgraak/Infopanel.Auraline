@@ -60,6 +60,8 @@ public sealed class ProviderManagerTests : IDisposable
         var status = manager.GetStatuses().Single();
         Assert.Equal(ProviderLifecycleState.Reconnecting, status.State);
         Assert.Contains("connection refused", status.LastError);
+        Assert.Equal(1, status.ReconnectCount);
+        Assert.Equal(500, status.RetryDelayMs);
         Assert.Equal(TimeSpan.FromMilliseconds(500), delay.Observed.Single());
 
         await manager.StopAsync(new CancellationTokenSource(TimeSpan.FromSeconds(2)).Token);
