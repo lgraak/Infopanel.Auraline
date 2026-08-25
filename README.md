@@ -2,9 +2,9 @@
 
 InfoPanel.Auraline is a Windows-first visualization platform that turns portable audio data from [Resonance Signal](https://github.com/lgraak/resonance-signal) into reusable rendered visuals. The current executable support is Windows only; Linux binaries and integrations are not implemented or supported. Reusable product logic is intentionally kept behind cross-platform boundaries so Linux support can be added later without replacing the Auraline core.
 
-M2 implements the first Host-owned waveform engine while preserving the established boundaries.
+M3 implements Host-owned render sessions and the first local frame transport while preserving the established boundaries.
 
-## What works in M2
+## What works in M3
 
 Auraline Host now runs as a single per-user Windows tray application and also:
 
@@ -20,9 +20,17 @@ Auraline Host now runs as a single per-user Windows tray application and also:
 - normalizes and smooths waveform frames for visual stability;
 - renders an oscilloscope-style centered waveform using SkiaSharp with transparent background;
 - tracks waveform metrics and exposes waveform health + intent metadata in `/health`, Dashboard, and Diagnostics;
+- creates render sessions lazily for the stable `default-profile` plus requested dimensions;
+- shares one session, scheduler, and published frame stream among compatible consumers;
+- renders exact dynamic dimensions at 30 FPS by default, with 60 FPS accepted by the same scheduler;
+- publishes only rendered premultiplied RGBA8888 pixels through a platform-neutral transport contract;
+- uses one opaque Windows shared-memory mapping with two frame slots per active session;
+- protects readers from torn frames with an odd/even publication seqlock and retry validation;
+- tracks explicit and expiring consumer leases, retains idle sessions for 15 seconds, and evicts LRU zero-consumer sessions at the default 32-session cap;
+- exposes versioned `/api/v1/render-sessions/...` negotiation, heartbeat, detach, and diagnostics endpoints; and
 - runs bounded rolling Serilog logging.
 
-The Source Groups and Profiles pages remain placeholders. M2 is host-focused and does not include shared-memory transport, render sessions, stereo rendering, multi-source mixing, full profile editing, or functional InfoPanel runtime integration.
+The Source Groups and Profiles pages remain placeholders. M3 is Host/transport-focused and does not include stereo rendering, multi-source mixing, full profile editing, Linux transport, or functional InfoPanel runtime integration.
 
 ## Prerequisites
 
@@ -38,6 +46,7 @@ From the repository root:
 dotnet restore InfoPanel.Auraline.sln --configfile NuGet.Config
 dotnet build InfoPanel.Auraline.sln --configuration Debug --no-restore
 dotnet test InfoPanel.Auraline.sln --configuration Debug --no-build --no-restore
+dotnet format InfoPanel.Auraline.sln --verify-no-changes --no-restore
 ```
 
 Release build:
@@ -64,9 +73,31 @@ On the first successful start, Auraline opens the Dashboard in the default brows
 
 The Dashboard includes **Start Auraline with Windows** and System, Light, and Dark theme settings. Startup uses the current user's standard `Run` registry entry and requires no administrator privileges. A registration failure is shown on the Dashboard and does not crash the Host.
 
-### Observe the M2 waveform
+### Observe the waveform and M3 render sessions
 
-Start Resonance Signal on its default loopback listener, play audio through Windows Default Playback, and open `http://127.0.0.1:48481/diagnostics`. The Waveform Engine card reports the live stream metadata, state, counters, and render timing, and shows the latest `320x120` PNG snapshot produced by the real Host renderer. Refresh the page to update the snapshot; it is a bounded diagnostics preview, not the deferred M3 frame transport.
+Start Resonance Signal on its default loopback listener, play audio through Windows Default Playback, and open `http://127.0.0.1:48481/diagnostics`. The Waveform Engine card reports the live stream metadata, state, counters, and render timing, and shows the latest `320x120` PNG snapshot produced by the real Host renderer. Refresh the page to update the snapshot; it remains a bounded diagnostics preview rather than the high-rate transport.
+
+The Render Sessions card reports active sessions, leases, dimensions, target/actual frame rate, publication sequence, render-plus-publication timing, allocation size, grace state, and lifecycle counters. To prove the real cross-process Windows transport, run a separate probe process while Host is running:
+
+```powershell
+dotnet run --project tests/Auraline.TransportProbe --no-build -- --width 320 --height 120 --fps 30 --seconds 4
+```
+
+The probe attaches through HTTP, opens only the returned opaque shared-memory resource, validates complete frames and advancing sequence/pixels, heartbeats when needed, and detaches cleanly. Use `--width 640 --height 240` for a distinct session or `--fps 60` for the supported higher cadence. `--abrupt` intentionally skips detach for stale-lease acceptance.
+
+## Render-session control API
+
+All routes remain bound to `127.0.0.1` with the Host. The v1 control surface is:
+
+```text
+POST   /api/v1/render-sessions/attach
+POST   /api/v1/render-sessions/{sessionId}/leases/{leaseId}/heartbeat
+DELETE /api/v1/render-sessions/{sessionId}/leases/{leaseId}
+GET    /api/v1/render-sessions
+GET    /api/v1/render-sessions/{sessionId}
+```
+
+Attach accepts contract major/minor, `default-profile`, dimensions from 16 through 2048, and target FPS 30 or 60. Contract and shared-memory layout compatibility use major-version matching; an unsupported major fails explicitly.
 
 ## Per-user files
 
@@ -95,16 +126,17 @@ src/Auraline.Host/          Windows tray Host plus reusable loopback, persistenc
 src/Auraline.Contracts/     Host/plugin contract-version foundation without UI dependencies
 src/InfoPanel.Auraline/     Build-only plugin boundary; no functional integration yet
 tests/Auraline.Host.Tests/  Durable Host/config/provider and waveform tests
+tests/Auraline.TransportProbe/  External Windows shared-memory consumer proof
 docs/                       Architecture, roadmap, decisions, handoffs, and standards
 ```
 
-## Current limitations in M2
+## Current limitations in M3
 
 M2 does not implement:
 
 - LAN-hosted API access;
-- render-session management and shared-memory transport;
 - functional InfoPanel runtime integration;
+- Linux/local or network frame transport;
 - multi-source mixing and stereo render modes;
 - source-group/profile editing workflow.
 

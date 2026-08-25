@@ -1,5 +1,5 @@
 # Auraline.Contracts
 
-This dependency-light .NET 8 project contains contracts that genuinely cross the Auraline Host and plugin boundary. M1 introduces only `ContractVersion` with major-version compatibility semantics.
+This dependency-light .NET 8 project contains contracts that genuinely cross the Auraline Host and consumer boundary. M3 adds render-session negotiation, expiring consumer leases, and platform-neutral frame publication/reading contracts to `ContractVersion`.
 
-Provider-internal models, rendering details, Windows dependencies, and Host configuration remain outside this project. Functional plugin negotiation begins later.
+Provider-internal models, Windows memory-mapped-file types, InfoPanel types, and Host configuration remain outside this project. Functional InfoPanel integration begins in M4.

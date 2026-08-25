@@ -93,6 +93,15 @@ public sealed record WaveformRenderedFrame(
     [property: JsonPropertyName("target_fps")] int TargetFps,
     [property: JsonPropertyName("pixels")] byte[] Pixels);
 
+public sealed record WaveformRenderSnapshot(
+    WaveformProcessedFrame ProcessedFrame,
+    WaveformVisualizationState VisualState);
+
+public interface IWaveformRenderStateSource
+{
+    WaveformRenderSnapshot CaptureRenderState();
+}
+
 public interface IWaveformEngineStatusProvider
 {
     WaveformEngineHealth GetHealth();

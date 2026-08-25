@@ -13,4 +13,4 @@ Use one shared-memory buffer per active render session as the preferred v1 local
 
 ## Consequences
 
-The local consumer can receive frames efficiently, but session ownership, synchronization, naming, access control, cleanup, and crash recovery require explicit design in M3. Network frame transport remains deferred and can use a different implementation of the transport boundary.
+The local consumer can receive frames efficiently. M3 implements one opaque local-namespaced mapping per session, a 128-byte versioned header, two RGBA8888-premultiplied pixel slots, and an odd/even publication seqlock. Consumers retry if the publication version changes while copying. The Host owns mapping lifetime; explicit/expiring leases and 15-second zero-consumer grace provide deterministic cleanup after clean or crashed consumers. Network frame transport remains deferred and can use a different implementation of the transport boundary.

@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-This document records the architecture for InfoPanel.Auraline. M1 implemented the Windows tray Host, loopback UI/API, per-user configuration, provider lifecycle, and source-discovery foundation. M2 adds the Host-owned waveform engine and keeps render sessions and functional InfoPanel integration planned for M3-M4.
+This document records the architecture for InfoPanel.Auraline. M1 implemented the Windows tray Host and provider foundation, M2 added the Host-owned waveform engine, and M3 adds render sessions plus Windows local frame transport. Functional InfoPanel integration remains M4.
 
 ## Product and component boundaries
 
@@ -54,12 +54,13 @@ Current platform ownership is explicit:
 | Autostart | HKCU `Run` behind `IStartupRegistration` | XDG desktop or systemd-user mechanism, selected after runtime inspection |
 | Per-user paths | `%LOCALAPPDATA%\Auraline\` behind `IPlatformPaths` | XDG configuration/data/log paths |
 | Single instance | Local-namespaced semaphore and named pipe behind `ISingleInstanceCoordinator` | Equivalent per-user Linux coordination |
+| Frame transport | One opaque named shared-memory region per render session behind `IAuralineFrameTransport` | Local Linux transport adapter, mechanism deferred |
 | Browser launch | `IBrowserLauncher` with shell execution | Validate the existing implementation or replace only its platform adapter |
 | Provider, configuration, web, and contracts | OS-agnostic logic | Shared unchanged |
 
 New platform-specific behavior must be isolated behind a narrow boundary and document both its platform responsibility and the deferred Linux counterpart. A physical `Auraline.Host.Windows`/`Auraline.Host.Linux` or core project split is deferred until Linux implementation evidence requires it; the current bounded separation does not justify a large project restructure. See [ADR-0006](decisions/0006-windows-first-cross-platform-boundaries.md).
 
-M2 must preserve this boundary. The Resonance Signal waveform client and decoder, stream lifecycle, reconnect policy, waveform sample model, channel/mono processing, normalization, smoothing, idle/reconnecting/unavailable state, renderer abstraction, rendered-frame contract, and metrics remain OS-agnostic. SkiaSharp is treated as cross-platform unless package or runtime evidence establishes otherwise. The first Windows consumer is not a reason to introduce Windows APIs into waveform or rendering core logic.
+The Resonance Signal waveform client and decoder, stream lifecycle, reconnect policy, waveform sample model, channel/mono processing, normalization, smoothing, idle/reconnecting/unavailable state, renderer, render-session domain, transport contracts, and metrics remain OS-agnostic. SkiaSharp is treated as cross-platform unless package or runtime evidence establishes otherwise. Windows memory-mapped-file APIs exist only under `Platform/Windows`.
 
 ## Process, configuration, and storage
 
@@ -119,6 +120,10 @@ Profiles have stable IDs and friendly names, reference one source group, and own
 
 Consumers request render sessions from the Host. A session is keyed by at least profile and output dimensions; identical compatible requests may share a session. Consumers receive rendered frames and health metadata without taking ownership of rendering logic.
 
+M3 uses `default-profile` as the stable temporary profile identity. Compatibility includes requested target cadence, so a 30 FPS and 60 FPS request need not share even when profile/dimensions match. Attaching creates a distinct 25-second lease. Heartbeat renews only that lease; explicit detach or expiry removes only that consumer. Zero leases place the session in a 15-second grace state while rendering and transport allocation remain available. Reattach cancels grace and reuses the session.
+
+The default safety cap is 32 sessions. At capacity, zero-consumer sessions are ordered by last access and stable session ID and the oldest is evicted. Actively referenced sessions are never evicted; a new unique request fails clearly when every allowed session has a valid lease.
+
 ## Source identity and reconnect behavior
 
 The first proof uses Resonance Signal's logical source intent:
@@ -144,11 +149,15 @@ Provider/source rebinding is conservative: exact identity is preferred, high-con
 
 The Host performs all rendering; the InfoPanel plugin does not process waveform samples. Rendering accepts dynamic dimensions. M2 exposes the latest rendered frame as a no-cache PNG on the loopback diagnostics surface solely for live inspection; it encodes the real renderer output and is not a render session or frame-transport contract.
 
-Render sessions are created lazily and are keyed by at least profile plus dimensions. Compatible sessions may be shared. The intended v1 high-rate local frame transport is one shared-memory buffer per active render session, behind an abstraction that can later support network transport. Localhost HTTP remains appropriate for lower-rate metadata and control. See [ADR-0005](decisions/0005-shared-memory-frame-transport.md).
+Render sessions are created lazily and are keyed by profile, dimensions, and compatible cadence. One scheduler and transport publisher serve all consumers of a compatible session. Localhost HTTP performs versioned attach, heartbeat, detach, and diagnostics; high-rate pixels use one shared-memory allocation per session behind platform-neutral publication/reader contracts. See [ADR-0005](decisions/0005-shared-memory-frame-transport.md) and [ADR-0007](decisions/0007-auraline-frame-transport-abstraction.md).
 
 After the last consumer leaves, a session receives a 15-second grace period before teardown. An internal configurable safety cap limits concurrent sessions. If the cap is reached, idle sessions may be evicted before rejecting a new request; active sessions are never evicted to admit another session.
 
 The default frame rate is 30 FPS. The architecture should permit 60 FPS without making it a v1 default.
+
+The M3 scheduler renders the latest waveform state at the session cadence. Missed deadlines are skipped and reset from current time rather than accumulated. Each session sequence is monotonic; consumers read the latest complete frame and never queue historical pixels.
+
+Windows layout version 1 contains a 128-byte header followed by two fixed-capacity slots. The header records `AURL` magic, major/minor layout version, geometry, stride, RGBA8888-premultiplied format, payload/slot bounds, target FPS, sequence, UTC ticks, active slot, and an aligned publication version. The writer marks the version odd, fills the inactive slot, publishes metadata/slot, then makes the version even. A reader copies only between identical even version reads; a concurrent write causes retry. Pixel bytes are R, G, B, A in memory with Skia premultiplied alpha. The Host owns the mapping and writer; consumers are read-only. Raw waveform/audio samples never enter transport memory.
 
 ## Waveform v1 intent
 

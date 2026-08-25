@@ -16,7 +16,7 @@ public sealed class WaveformEngineService(
     WaveformProcessor processor,
     WaveformRenderer renderer,
     WaveformReconnectPolicy reconnectPolicy,
-    ILogger<WaveformEngineService> logger) : IHostedService, IAsyncDisposable, IWaveformEngineStatusProvider
+    ILogger<WaveformEngineService> logger) : IHostedService, IAsyncDisposable, IWaveformEngineStatusProvider, IWaveformRenderStateSource
 {
     private const int DefaultRenderWidth = 320;
     private const int DefaultRenderHeight = 120;
@@ -56,6 +56,7 @@ public sealed class WaveformEngineService(
     private double? _lastRenderDurationMs;
     private double? _averageRenderDurationMs;
     private WaveformRenderedFrame? _latestFrame;
+    private WaveformProcessedFrame? _latestProcessedFrame;
 
     public WaveformEngineHealth GetHealth()
     {
@@ -91,6 +92,16 @@ public sealed class WaveformEngineService(
     public WaveformRenderedFrame? GetLatestFrame()
     {
         lock (_gate) return _latestFrame;
+    }
+
+    public WaveformRenderSnapshot CaptureRenderState()
+    {
+        lock (_gate)
+        {
+            var processed = _latestProcessedFrame ?? new WaveformProcessedFrame(
+                "no-stream", 0, 0, 0, [0f], [[0f]]);
+            return new WaveformRenderSnapshot(processed, _visualState);
+        }
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -312,7 +323,7 @@ public sealed class WaveformEngineService(
         var frame = WaveformProtocolParser.ParseWaveformBinary(payload, _channelCount.Value);
         ValidateContinuity(frame);
         var processed = processor.ProcessFrame(frame, _streamId!);
-        lock (_gate) { _waveformFrames++; _latestFrameTime = DateTimeOffset.UtcNow; }
+        lock (_gate) { _waveformFrames++; _latestFrameTime = DateTimeOffset.UtcNow; _latestProcessedFrame = processed; }
 
         EvaluateAudioState(processor.CurrentMaxMagnitude);
         RenderFrame(processed, frame.Sequence);

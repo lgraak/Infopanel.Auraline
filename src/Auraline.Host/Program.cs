@@ -1,9 +1,11 @@
+using Auraline.Contracts;
 using Auraline.Host.Configuration;
 using Auraline.Host.Lifecycle;
 using Auraline.Host.Waveform;
 using Auraline.Host.Platform;
 using Auraline.Host.Platform.Windows;
 using Auraline.Host.Providers;
+using Auraline.Host.RenderSessions;
 using Auraline.Host.Web;
 using Serilog;
 using Serilog.Events;
@@ -60,7 +62,13 @@ public static class Program
             builder.Services.AddSingleton<WaveformReconnectPolicy>();
             builder.Services.AddSingleton<WaveformEngineService>();
             builder.Services.AddSingleton<IWaveformEngineStatusProvider>(services => services.GetRequiredService<WaveformEngineService>());
+            builder.Services.AddSingleton<IWaveformRenderStateSource>(services => services.GetRequiredService<WaveformEngineService>());
             builder.Services.AddHostedService(services => services.GetRequiredService<WaveformEngineService>());
+            builder.Services.AddSingleton<IAuralineFrameTransportFactory, WindowsSharedMemoryFrameTransportFactory>();
+            builder.Services.AddSingleton<IRenderSessionClock, SystemRenderSessionClock>();
+            builder.Services.AddSingleton(RenderSessionOptions.Default);
+            builder.Services.AddSingleton<RenderSessionManager>();
+            builder.Services.AddHostedService(services => services.GetRequiredService<RenderSessionManager>());
             builder.Services.AddSingleton<IStartupRegistration, WindowsStartupRegistration>();
             builder.Services.AddSingleton<StartupRegistrationState>();
             builder.Services.AddSingleton<HostStatusService>();
@@ -69,7 +77,7 @@ public static class Program
             app = builder.Build();
             app.Use(async (context, next) =>
             {
-                if (HttpMethods.IsPost(context.Request.Method) && !LoopbackRequestGuard.IsAllowed(context.Request, configuration.Current.Host.Port))
+                if (IsStateChanging(context.Request.Method) && !LoopbackRequestGuard.IsAllowed(context.Request, configuration.Current.Host.Port))
                 {
                     context.Response.StatusCode = StatusCodes.Status403Forbidden;
                     return;
@@ -126,6 +134,7 @@ public static class Program
 
     public static void MapEndpoints(WebApplication app)
     {
+        app.MapRenderSessionEndpoints();
         app.MapGet("/health", (HostStatusService status) => Results.Json(status.GetHealth()));
         app.MapGet("/waveform/preview.png", (HttpResponse response, IWaveformEngineStatusProvider waveform, WaveformRenderer renderer) =>
         {
@@ -173,4 +182,7 @@ public static class Program
             return Results.Redirect("/");
         });
     }
+
+    private static bool IsStateChanging(string method) =>
+        HttpMethods.IsPost(method) || HttpMethods.IsPut(method) || HttpMethods.IsPatch(method) || HttpMethods.IsDelete(method);
 }

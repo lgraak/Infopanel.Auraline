@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Auraline.Host.Configuration;
 using Auraline.Host.Providers;
+using Auraline.Host.RenderSessions;
 using Auraline.Host.Waveform;
 
 namespace Auraline.Host.Web;
@@ -11,6 +12,7 @@ public sealed record HealthContract(
     [property: JsonPropertyName("provider_summary")] ProviderSummaryContract ProviderSummary,
     [property: JsonPropertyName("providers")] IReadOnlyList<ProviderHealthContract> Providers,
     [property: JsonPropertyName("waveform")] WaveformEngineHealth? Waveform,
+    [property: JsonPropertyName("render_sessions")] RenderSessionDiagnostics? RenderSessions,
     [property: JsonPropertyName("configuration_error")] string? ConfigurationError);
 
 public sealed record ProviderSummaryContract(
@@ -30,7 +32,8 @@ public sealed record ProviderHealthContract(
 public sealed class HostStatusService(
     ConfigurationStore configuration,
     ProviderManager providers,
-    IWaveformEngineStatusProvider? waveformEngine = null)
+    IWaveformEngineStatusProvider? waveformEngine = null,
+    RenderSessionManager? renderSessions = null)
 {
     public static string Version
     {
@@ -52,6 +55,6 @@ public sealed class HostStatusService(
         return new(configuration.LoadError is null ? "healthy" : "degraded", Version,
             new(statuses.Count, enabled, connected, unavailable),
             statuses.Select(p => new ProviderHealthContract(p.Id, p.FriendlyName, p.Enabled,
-                p.State.ToString(), p.Sources.Count, p.LastError)).ToArray(), waveformEngine?.GetHealth(), configuration.LoadError);
+                p.State.ToString(), p.Sources.Count, p.LastError)).ToArray(), waveformEngine?.GetHealth(), renderSessions?.GetDiagnostics(), configuration.LoadError);
     }
 }

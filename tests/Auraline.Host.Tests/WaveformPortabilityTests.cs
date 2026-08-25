@@ -32,6 +32,33 @@ public sealed class WaveformPortabilityTests
         }
     }
 
+    [Fact]
+    public void TransportContractsAndSessionDomainShouldNotReferenceWindowsOnlyApis()
+    {
+        var repoRoot = FindRepositoryRoot(new DirectoryInfo(AppContext.BaseDirectory));
+        var paths = new[]
+        {
+            Path.Combine(repoRoot.FullName, "src", "Auraline.Contracts"),
+            Path.Combine(repoRoot.FullName, "src", "Auraline.Host", "RenderSessions")
+        };
+        var forbiddenTokens = new[]
+        {
+            "System.IO.MemoryMappedFiles",
+            "MemoryMappedFile",
+            "Microsoft.Win32",
+            "System.Windows.Forms",
+            "InfoPanel.Plugins"
+        };
+
+        foreach (var directory in paths)
+            foreach (var file in Directory.EnumerateFiles(directory, "*.cs", SearchOption.AllDirectories))
+            {
+                var text = File.ReadAllText(file);
+                foreach (var token in forbiddenTokens)
+                    Assert.DoesNotContain(token, text, StringComparison.OrdinalIgnoreCase);
+            }
+    }
+
     private static DirectoryInfo FindRepositoryRoot(DirectoryInfo start)
     {
         var current = start;

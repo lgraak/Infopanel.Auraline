@@ -30,3 +30,7 @@ Auraline defines transport as an explicit abstraction independent of plugin cont
 3. InfoPanel.Auraline can remain mostly shared for session orchestration, with platform adapters for plugin-image integration.
 4. Transport behavior is no longer coupled to one InfoPanel repository implementation detail.
 5. Future network transport work can reuse the same Auraline session and frame abstractions.
+
+## M3 implementation note
+
+`Auraline.Contracts` now defines OS-neutral session descriptors, consumer leases, frame publication/read results, and publisher/reader/factory interfaces. The concrete `MemoryMappedFile` implementation and its opaque resource naming live under `Auraline.Host/Platform/Windows`; neither Windows nor InfoPanel types appear in the shared contracts or render-session domain. The descriptor exposes only transport kind/version, opaque resource name, allocation/header/slot geometry, and pixel format needed by a compatible local adapter.

@@ -54,7 +54,7 @@ public static class UiRenderer
         Page(title, theme, $"<h1>{E(title)}</h1><section><p>{E(title)} functionality arrives in {E(milestone)}. This navigation entry establishes the intended product shape only.</p></section>");
 
     public static string Diagnostics(HealthContract health, string theme) =>
-        Page("Diagnostics", theme, $"<h1>Diagnostics</h1><p>Host version: <strong>{E(health.HostVersion)}</strong></p><p>Health: <strong>{E(health.HostStatus)}</strong></p><p><a href=/health>Machine-readable health API</a></p>{WaveformCard(health.Waveform)}<p>Detailed diagnostics and export arrive in M6.</p>");
+        Page("Diagnostics", theme, $"<h1>Diagnostics</h1><p>Host version: <strong>{E(health.HostVersion)}</strong></p><p>Health: <strong>{E(health.HostStatus)}</strong></p><p><a href=/health>Machine-readable health API</a></p>{WaveformCard(health.Waveform)}{RenderSessionsCard(health.RenderSessions)}<p>Detailed diagnostics and export arrive in M6.</p>");
 
     private static string ProviderTable(IReadOnlyList<ProviderHealthContract> providers) =>
         "<table><thead><tr><th>Name</th><th>Enabled</th><th>State</th><th>Sources</th><th>Last reason</th></tr></thead><tbody>" +
@@ -80,6 +80,14 @@ public static class UiRenderer
                $"<li>Average render duration: {FormatOptionalDoubleMs(health.AverageRenderDurationMs)}</li>" +
                $"<li>Retry state: {E(health.RetryState)}</li>" +
                $"</ul><figure class=waveform-preview><img src=\"/waveform/preview.png?frame={health.RenderedFrames}\" width=320 height=120 alt=\"Latest waveform renderer frame\"><figcaption>Latest frame from the real M2 renderer. Refresh this page to update the snapshot.</figcaption></figure></section>";
+    }
+
+    private static string RenderSessionsCard(Auraline.Host.RenderSessions.RenderSessionDiagnostics? diagnostics)
+    {
+        if (diagnostics is null) return "<section><h2>Render Sessions</h2><p>Render-session manager has not started yet.</p></section>";
+        var rows = string.Join("", diagnostics.Sessions.Select(session =>
+            $"<tr><td><code>{E(session.SessionId)}</code></td><td><code>{E(session.ProfileId)}</code></td><td>{session.Width}×{session.Height}</td><td>{session.TargetFps}</td><td>{session.ActualFps:F1}</td><td>{session.ConsumerCount}</td><td>{E(session.State)}</td><td>{session.PublishedSequence}</td><td>{session.AllocationSize}</td></tr>"));
+        return $"<section><h2>Render Sessions</h2><p>{diagnostics.ActiveSessionCount} sessions, {diagnostics.TotalConsumerLeases} leases, cap {diagnostics.SessionCap}. Created {diagnostics.SessionCreationCount}; torn down {diagnostics.TeardownCount}; evicted {diagnostics.EvictionCount}; rejected {diagnostics.RejectedSessionCount}.</p><div class=table-wrap><table><thead><tr><th>Session</th><th>Profile</th><th>Size</th><th>Target FPS</th><th>Actual FPS</th><th>Consumers</th><th>State</th><th>Sequence</th><th>Bytes</th></tr></thead><tbody>{rows}</tbody></table></div></section>";
     }
 
     private static string FormatOptionalDoubleMs(double? value) => value is null ? "—" : $"{value:F1} ms";

@@ -9,7 +9,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
-    <InformationalVersion>1.0.0-m2</InformationalVersion>
+    <InformationalVersion>1.0.0-m3</InformationalVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

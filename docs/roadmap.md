@@ -7,7 +7,7 @@ This roadmap describes intent, not shipped functionality. M4 is the first true e
 - [x] M0: Repository and architecture skeleton
 - [x] M1: Auraline Host core
 - [x] M2: Waveform engine
-- [ ] M3: Render-session and IPC layer
+- [x] M3: Render-session and IPC layer
 - [ ] M4: InfoPanel.Auraline end-to-end integration
 - [ ] M5: Host configuration UI
 - [ ] M6: Diagnostics and beta readiness
@@ -30,6 +30,8 @@ M2 now includes a Host-owned websocket waveform path (`default-playback`), proto
 ### M3: Render-session and IPC layer
 
 Implement lazy render-session lifecycle, compatible-session sharing, the 15-second teardown grace period, configurable concurrent-session safety cap, safe idle eviction, and the local shared-memory frame transport behind a transport abstraction.
+
+M3 now includes the stable temporary `default-profile`, profile/dimension/FPS-compatible sharing, 25-second renewable leases, exact-dimension 30/60 FPS scheduling without deadline backlog, a default cap of 32, deterministic idle LRU eviction, versioned two-slot Windows shared memory with seqlock validation, loopback v1 session control/diagnostics, and an external cross-process probe. Linux transport and functional InfoPanel use remain deferred.
 
 ### M4: InfoPanel.Auraline end-to-end integration
 
