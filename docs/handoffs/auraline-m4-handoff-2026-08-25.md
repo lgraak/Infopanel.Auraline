@@ -1,12 +1,13 @@
 # Auraline M4 Windows InfoPanel Integration Handoff
 
 Date: 2026-08-25T13:08:16.078-07:00
-Status: completed locally; publication pending explicit approval
+Publication reconciliation: 2026-08-25T13:14:03.405-07:00
+Status: completed and published; evidence-only reconciliation follows the published M4 checkpoint
 Model: GPT-5 Codex
 Effort: High
 Repository: InfoPanel.Auraline (`D:\Aeons\Git\Infopanel.Auraline`)
 Branch: `main`
-HEAD: `6c48a477fbda55af2e3f7e6c41564d38d1b715a6` (final M4 implementation checkpoint; this handoff commit follows it)
+HEAD: `51178bac600e2a0ca55d6a1b401139d07ede74f5` (published M4 acceptance-evidence checkpoint; this reconciliation follows it)
 Authoritative remote: `origin` at `https://github.com/lgraak/Infopanel.Auraline.git`
 
 > This handoff is a continuation checkpoint, not authoritative truth. Current
@@ -73,12 +74,19 @@ excluded.
   handoff commit.
 - Working tree was clean after the implementation commits and contained only this
   new handoff before its commit.
-- Push/readback: not performed. Shared `main` publication still requires explicit
-  current-chat approval.
+- Publication authorization was supplied in the 2026-08-25 M4 publication packet.
+  After a fresh fetch confirmed `origin/main` still at `d88ec9ee1549e54096e47566fa434d9ba69e48cd`,
+  ancestry was valid and divergence was `0 3`; a normal fast-forward push published
+  all three M4 commits through `51178bac600e2a0ca55d6a1b401139d07ede74f5`.
+- Post-push authoritative readback: fresh `git fetch`, local `HEAD`, `origin/main`,
+  and `git ls-remote origin refs/heads/main` all returned
+  `51178bac600e2a0ca55d6a1b401139d07ede74f5`; divergence was `0 0` before this
+  evidence-only reconciliation.
 - Preserved unrelated changes: none were present in the Auraline checkout.
 - External InfoPanel checkout remained on local `1.4.x` HEAD
   `8ef8692cbd0de54db3377380b6722df1da3eae1a`, four commits ahead of its upstream;
-  M4 made no changes in that repository.
+  read-only `ls-remote` confirmed authoritative upstream `1.4.x` still at
+  `8a3062d7fbcee3381c2fd01e1a3a62cac5756c42`. M4 made no changes in that repository.
 
 ## Current Known-Good State
 
@@ -205,6 +213,16 @@ excluded.
 
 - `git fetch origin --prune`: passed at preflight and after implementation. Final
   implementation divergence before the handoff commit was `0 2`.
+- Publication reconciliation: fresh pre-push fetch confirmed `origin/main` at
+  `d88ec9ee1549e54096e47566fa434d9ba69e48cd`, local divergence `0 3`, and valid
+  fast-forward ancestry. `git push origin main` published through
+  `51178bac600e2a0ca55d6a1b401139d07ede74f5`; post-push fetch and `ls-remote`
+  independently returned that SHA with divergence `0 0`.
+- External prerequisite readback: the InfoPanel checkout was clean on local `1.4.x`
+  at `8ef8692cbd0de54db3377380b6722df1da3eae1a`; cached upstream and read-only
+  `ls-remote` both returned `8a3062d7fbcee3381c2fd01e1a3a62cac5756c42`,
+  confirming the required four local commits remain unpublished. No fetch, edit,
+  or push was performed in that repository.
 - `dotnet restore InfoPanel.Auraline.sln --configfile NuGet.Config`: passed; all six
   projects were current.
 - `dotnet build InfoPanel.Auraline.sln --configuration Debug --no-restore`: passed,
@@ -277,10 +295,14 @@ excluded.
 
 - Implemented: complete bounded M4 behavior at final implementation checkpoint
   `6c48a477fbda55af2e3f7e6c41564d38d1b715a6`.
-- Committed: two local implementation/correction commits; this handoff is committed
-  separately as the publication checkpoint.
-- Pushed: no. Fresh `origin/main` remained at
-  `d88ec9ee1549e54096e47566fa434d9ba69e48cd`; push approval was not inferred.
+- Committed: implementation commits `4b1ce1a98f1261f26a7097f7ca78420e4c43b8ae`
+  and `6c48a477fbda55af2e3f7e6c41564d38d1b715a6`, followed by acceptance-evidence
+  commit `51178bac600e2a0ca55d6a1b401139d07ede74f5`; this publication reconciliation
+  is committed separately so the original checkpoint does not imply knowledge of
+  its own publication result.
+- Pushed: all three M4 commits through `51178bac600e2a0ca55d6a1b401139d07ede74f5`
+  were published by normal fast-forward and authoritatively read back at that SHA
+  with divergence `0 0` before this evidence-only reconciliation.
 - Deployed or activated: final four-file package is activated only in the local
   `%ProgramData%` InfoPanel plugin folder. Two test visualization items and the 30
   FPS setting remain in the user's local InfoPanel profile/configuration.
@@ -325,8 +347,9 @@ excluded.
 - No audio samples, waveform pixels, credentials, or secret values were persisted or
   committed. Runtime mappings contain only current rendered-frame pixels/metadata and
   disappear with their owner processes.
-- Pushing shared `main` still requires explicit current-chat approval and must be
-  followed by authoritative fetch/remote SHA readback.
+- Publication used the packet's explicit authorization and a normal fast-forward;
+  no force push, merge, rebase, or history rewrite occurred. This evidence-only
+  reconciliation requires its own normal push and authoritative readback.
 
 ## Do Not Redo or Reopen
 
@@ -351,5 +374,6 @@ excluded.
 
 ## Next Recommended Action
 
-After explicit current-chat approval, push the three local M4 commits on `main` to
-`origin/main`, then fetch and verify the authoritative remote SHA and zero divergence.
+Begin the bounded M5 Auraline Host configuration UI and persistent profile/source-group
+management milestone, while retaining upstream publication of the InfoPanel
+dimension-demand prerequisite as a separate beta-release gate.
