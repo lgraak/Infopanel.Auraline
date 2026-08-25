@@ -1,12 +1,12 @@
 # Auraline M6 Diagnostics and Beta Readiness Handoff
 
-Date: 2026-08-25T16:00:00-07:00
-Status: implementation, automated validation, package acceptance, and packaged Host acceptance completed; plugin binary activation and remote publication remain gated
+Date: 2026-08-25T16:06:11-07:00
+Status: partial; implementation and package acceptance are complete, but supported InfoPanel shutdown is unavailable to this executor, so exact plugin activation and publication remain gated
 Model: GPT-5 Codex
 Effort: High
 Repository: InfoPanel.Auraline
 Branch: `main`
-HEAD: `b242ee3022c0c87d665bfd28a7420502cea99215` (local M6 implementation checkpoint; this handoff follows it)
+HEAD: `e02e88451dbda09ae9ba8eddff309768e94f99dd` (local M6 acceptance-evidence checkpoint; this reconciliation follows it)
 Authoritative remote: `origin` at `https://github.com/lgraak/Infopanel.Auraline.git`
 
 > This handoff is a continuation checkpoint, not authoritative truth. Current
@@ -36,9 +36,12 @@ Linux, installer, updater, or InfoPanel prerequisite change was included.
 
 - Windows 11 x64, .NET 8 runtime with current SDK tooling, and PowerShell in the
   managed checkout. No repository-local `AGENTS.md` exists.
-- Preflight: clean `main` at `12149917b842139f0d0014b887079493da151ac6`,
-  `origin/main` tracking the same commit, authoritative divergence `0 0` after
-  fetch, and no unrelated user work.
+- Final-activation preflight: clean local `main` at
+  `e02e88451dbda09ae9ba8eddff309768e94f99dd`, tracking `origin/main` at
+  `12149917b842139f0d0014b887079493da151ac6`, with divergence `0 2` after a
+  fresh fetch and no unrelated user work. The remote commit is an ancestor of
+  local `HEAD`, so publication remains fast-forward-safe if runtime acceptance
+  later succeeds.
 - Resonance Signal protocol v1 and the local InfoPanel consumer-dimension
   prerequisite were already running. Two existing consumers requested
   `300x300@30` and `600x150@30`.
@@ -46,16 +49,22 @@ Linux, installer, updater, or InfoPanel prerequisite change was included.
   `%TEMP%\Auraline-M6-config-backup-0ed8cc0cda6942ea9a7c4953ffa1271a`
   before controlled Host activation. Repository build/package outputs remain
   ignored.
+- Windows Computer Use could enumerate ordinary application windows but returned
+  no targetable InfoPanel window or supported tray menu. The running InfoPanel
+  process family was therefore left untouched rather than force-terminated.
 
 ## Current Repository State
 
 - Local implementation commit:
   `b242ee3022c0c87d665bfd28a7420502cea99215` (`Prepare Auraline beta diagnostics`).
-- Fresh remote readback after the rejected publication attempt: `origin/main`
-  remains `12149917b842139f0d0014b887079493da151ac6`; local divergence is one commit
-  ahead and zero behind.
+- Local acceptance-evidence commit:
+  `e02e88451dbda09ae9ba8eddff309768e94f99dd`
+  (`Record Auraline M6 acceptance evidence`).
+- Fresh remote readback: `origin/main` remains
+  `12149917b842139f0d0014b887079493da151ac6`; local divergence before this
+  reconciliation is zero behind and two commits ahead.
 - The implementation commit contains 28 intended files, 812 insertions, and 26
-  deletions. This handoff is the only subsequent working-tree addition.
+  deletions. The acceptance-evidence commit adds only this handoff.
 - No reset, stash, clean, force push, merge, rebase, branch, or history rewrite
   occurred.
 
@@ -64,6 +73,11 @@ Linux, installer, updater, or InfoPanel prerequisite change was included.
 - The final framework-dependent package is
   `dist/Auraline-0.1.0-beta.1-win-x64.zip` with SHA-256
   `DC241E30AEF34D9E70253F039575311964C6BB5878BB13F73F32D7AD71FF1FA4`.
+- Fresh inspection reconfirmed that the ZIP plugin folder contains exactly
+  `Auraline.Contracts.dll`, `InfoPanel.Auraline.dll`,
+  `InfoPanel.Auraline.deps.json`, and `PluginInfo.ini`. All four active plugin
+  hashes differ from the packaged M6 files, confirming that activation has not
+  occurred.
 - The packaged Host is currently running healthy as `0.1.0-beta.1`, using the
   preserved three-profile configuration. Resonance Signal is connected and the
   two existing InfoPanel consumers recovered automatically as two sessions and
@@ -173,6 +187,15 @@ Linux, installer, updater, or InfoPanel prerequisite change was included.
 - Portability guards passed; new domain/API models do not introduce Windows APIs.
   Windows-specific waveform/frame transport and packaging remain at explicit
   platform boundaries.
+- Final-activation preflight rerun: ZIP SHA-256 matched the recorded value; exact
+  four-file packaged plugin content was reconfirmed; active-plugin/package hash
+  inequality was observed; packaged Host, Resonance Signal, and the InfoPanel
+  process family were running; fresh `origin/main` readback remained `1214991`
+  with divergence `0 2` and fast-forward ancestry.
+- Supported InfoPanel shutdown was not available: Windows Computer Use returned
+  no targetable InfoPanel window or tray menu. No forced termination, plugin
+  replacement, backup mutation, runtime acceptance, self-test rerun, or push was
+  attempted after that gate failed.
 - Not run: another physical clean Windows machine; public InfoPanel build; Linux;
   LAN/network consumers; source mixing; installer/updater; or plugin binary
   replacement during this run.
@@ -181,7 +204,8 @@ Linux, installer, updater, or InfoPanel prerequisite change was included.
 
 - Implemented: complete bounded M6 repository behavior at `b242ee3`.
 - Committed: local implementation commit
-  `b242ee3022c0c87d665bfd28a7420502cea99215`; this handoff follows it.
+  `b242ee3022c0c87d665bfd28a7420502cea99215` and acceptance-evidence commit
+  `e02e88451dbda09ae9ba8eddff309768e94f99dd`; this reconciliation follows them.
 - Pushed: not pushed. The authoritative remote remains the M5 publication record
   `12149917b842139f0d0014b887079493da151ac6` after fresh fetch.
 - Deployed or activated: the final packaged M6 Host is active locally. The M5
@@ -196,14 +220,15 @@ Linux, installer, updater, or InfoPanel prerequisite change was included.
 ## Unresolved Issues and Unverified Assumptions
 
 - Plugin binary activation from the final ZIP was not performed. InfoPanel's
-  standard window close minimized to its tray and active leases remained; the
-  established safety boundary prohibits terminating locked InfoPanel processes.
-  The exact plugin package was built, hashed, and repository-tested, while live
-  consumers continued using the compatible M5 binary.
+  standard window close had minimized it to its tray, and the current executor's
+  supported Windows-control interface exposed neither an InfoPanel window nor its
+  tray menu. The established safety boundary prohibits terminating the running
+  process family. The exact plugin package was rehashed and inspected, while the
+  active four-file plugin remained the different compatible M5 binary.
 - No separate clean Windows machine was available, so clean-machine installation
   is documented but not claimed as validated.
-- Direct push to `origin/main` was rejected at the publication approval gate.
-  Remote state was refreshed afterward and remains one commit behind local.
+- Publication was deliberately withheld because exact-plugin activation acceptance
+  did not pass. The remote was refreshed and remains two commits behind local.
 - The three established Skia obsolete-text warnings remain outside M6 scope.
 
 ## Safety, Rollback, and Access Considerations
@@ -214,6 +239,9 @@ Linux, installer, updater, or InfoPanel prerequisite change was included.
   local summary/export files, and normal InfoPanel window close/minimize. InfoPanel
   was not terminated, its plugin folder was not changed, and Resonance Signal was
   not modified.
+- The final-activation attempt added no runtime mutation: no backup was created,
+  no plugin file was replaced, and no process was stopped because the required
+  graceful InfoPanel exit operation was unavailable.
 - Roll back the active Host by exiting it and starting the prior M5 Release binary;
   configuration schema and M3/M4 wire contracts were not changed incompatibly.
 - No raw samples, pixels, credentials, analytics, uploads, automatic submission,
@@ -232,7 +260,6 @@ Linux, installer, updater, or InfoPanel prerequisite change was included.
 
 ## Next Recommended Action
 
-Obtain explicit publication approval, then push local `main` by normal
-fast-forward to `origin/main` and verify authoritative SHA/divergence readback;
-afterward begin a small controlled beta feedback phase only when the compatible
-InfoPanel prerequisite can be shipped to those testers.
+Use InfoPanel's supported tray `Exit` operation in an interactive session, verify
+the InfoPanel process family exits normally, then resume exact packaged-plugin
+activation and the remaining M6 acceptance/publication gates.
