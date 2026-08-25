@@ -1,6 +1,6 @@
 # Auraline Roadmap
 
-This roadmap describes intent, not shipped functionality. M4 is the first true end-to-end proof.
+This roadmap distinguishes shipped milestone scope from deferred intent. M4 is the first true end-to-end proof; M5 is the first persistent product-configuration milestone.
 
 ## Milestone checklist
 
@@ -9,7 +9,7 @@ This roadmap describes intent, not shipped functionality. M4 is the first true e
 - [x] M2: Waveform engine
 - [x] M3: Render-session and IPC layer
 - [x] M4: InfoPanel.Auraline end-to-end integration
-- [ ] M5: Host configuration UI
+- [x] M5: Host configuration UI and persistent profiles
 - [ ] M6: Diagnostics and beta readiness
 
 ## Milestones
@@ -41,7 +41,9 @@ The M4 repository implementation includes the Windows plugin, profile catalog, e
 
 ### M5: Host configuration UI
 
-Expand the M1 localhost-only ASP.NET Core status/control shell into the complete configuration UI for provider definition editing, source groups, profiles, and richer health. Preserve the v1 local-only security boundary; manual provider enable/disable, reconnect, refresh, startup, and theme controls already exist.
+M5 expands the localhost-only Host shell into functional provider, source, source-group, profile, and diagnostics pages. It preserves M4 `host.json` and stable `default-profile` identity while adding atomic per-object product configuration, last-known source evidence, dependency-safe CRUD, default promotion, duplicate, revisioned profile saves, real-renderer working-copy preview, and hot apply to active sessions.
+
+The persistent model accepts explicit-source, multi-source, and cross-provider groups, but the current waveform runtime still renders only a single local logical Default Playback member. Unsupported groups remain visible and fail preview/session attach clearly; mixing is not implied by configuration support.
 
 ### M6: Diagnostics and beta readiness
 
@@ -64,7 +66,7 @@ These ideas are intentionally retained without expanding the initial proof:
 
 - stereo-split and stereo-overlay modes;
 - filled or mirrored waveform styles;
-- configurable smoothing and interpolation algorithms;
+- additional smoothing and interpolation algorithms beyond M5's bounded amount control;
 - configurable attack and decay;
 - line-thickness controls;
 - glow and blur;

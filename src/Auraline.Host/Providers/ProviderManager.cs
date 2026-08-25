@@ -11,15 +11,17 @@ public sealed class ProviderManager : IHostedService, IDisposable
     private readonly IProviderConnector _connector;
     private readonly IAsyncDelay _delay;
     private readonly ILogger<ProviderManager> _logger;
+    private readonly ProductConfigurationStore? _products;
     private readonly ConcurrentDictionary<string, Runtime> _runtimes = new(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource? _hostCancellation;
 
-    public ProviderManager(ConfigurationStore configuration, IProviderConnector connector, IAsyncDelay delay, ILogger<ProviderManager> logger)
+    public ProviderManager(ConfigurationStore configuration, IProviderConnector connector, IAsyncDelay delay, ILogger<ProviderManager> logger, ProductConfigurationStore? products = null)
     {
         _configuration = configuration;
         _connector = connector;
         _delay = delay;
         _logger = logger;
+        _products = products;
     }
 
     public IReadOnlyList<ProviderStatus> GetStatuses() => _runtimes.Values.Select(runtime => runtime.Snapshot()).OrderBy(p => p.FriendlyName).ToArray();
@@ -61,6 +63,59 @@ public sealed class ProviderManager : IHostedService, IDisposable
         }
     }
 
+    public async Task<ProviderConfiguration> AddAsync(ProviderConfiguration provider, CancellationToken cancellationToken = default)
+    {
+        if (_configuration.Current.Providers.Any(item => item.Id.Equals(provider.Id, StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException($"Provider '{provider.Id}' already exists.");
+        await _configuration.UpdateAsync(current => current with { Providers = [.. current.Providers, provider] }, cancellationToken);
+        var runtime = _runtimes.GetOrAdd(provider.Id, _ => new Runtime(provider));
+        if (provider.Enabled) StartRuntime(runtime);
+        return provider;
+    }
+
+    public async Task<ProviderConfiguration> UpdateAsync(string providerId, ProviderConfiguration provider, CancellationToken cancellationToken = default)
+    {
+        if (!provider.Id.Equals(providerId, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Provider ID is stable and cannot be changed.", nameof(provider));
+        _ = FindConfiguration(providerId);
+        await _configuration.UpdateAsync(current => current with
+        {
+            Providers = current.Providers.Select(item => item.Id.Equals(providerId, StringComparison.OrdinalIgnoreCase) ? provider : item).ToList()
+        }, cancellationToken);
+        var runtime = GetRuntime(providerId);
+        var wasEnabled = runtime.Snapshot().Enabled;
+        var endpointChanged = !runtime.Configuration.Endpoint.Equals(provider.Endpoint, StringComparison.OrdinalIgnoreCase);
+        runtime.UpdateConfiguration(provider);
+        if (!provider.Enabled)
+        {
+            await runtime.StopAsync();
+            runtime.SetState(ProviderLifecycleState.Disabled, null);
+        }
+        else if (!wasEnabled || endpointChanged)
+        {
+            await runtime.StopAsync();
+            runtime.SetState(ProviderLifecycleState.Disconnected, null);
+            StartRuntime(runtime);
+        }
+        return provider;
+    }
+
+    public async Task DeleteAsync(string providerId, CancellationToken cancellationToken = default)
+    {
+        _ = FindConfiguration(providerId);
+        var dependencies = _products?.GetProviderDependencies(providerId) ?? [];
+        if (dependencies.Count > 0)
+            throw new ConfigurationDependencyException($"Provider '{providerId}' cannot be deleted because it is referenced by {string.Join("; ", dependencies)}.");
+        var runtime = GetRuntime(providerId);
+        await runtime.StopAsync();
+        await _configuration.UpdateAsync(current => current with
+        {
+            Providers = current.Providers.Where(item => !item.Id.Equals(providerId, StringComparison.OrdinalIgnoreCase)).ToList()
+        }, cancellationToken);
+        _runtimes.TryRemove(providerId, out _);
+        runtime.Dispose();
+    }
+
     public async Task ReconnectAsync(string providerId)
     {
         var runtime = GetRuntime(providerId);
@@ -81,6 +136,7 @@ public sealed class ProviderManager : IHostedService, IDisposable
         {
             var result = await _connector.ConnectAndDiscoverAsync(runtime.Configuration, cancellationToken);
             runtime.SetConnected(result);
+            await RecordSourcesBestEffortAsync(cancellationToken);
             _logger.LogInformation("Refreshed {SourceCount} sources for provider {ProviderId}", result.Sources.Count, providerId);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -96,6 +152,7 @@ public sealed class ProviderManager : IHostedService, IDisposable
     {
         var runtime = GetRuntime(providerId);
         runtime.UpdateSourceMetadata(sourceId, channelCount, sampleRateHz);
+        _ = RecordSourcesBestEffortAsync(CancellationToken.None);
     }
 
     private void StartRuntime(Runtime runtime)
@@ -118,6 +175,7 @@ public sealed class ProviderManager : IHostedService, IDisposable
             {
                 var result = await _connector.ConnectAndDiscoverAsync(runtime.Configuration, cancellationToken);
                 runtime.SetConnected(result);
+                await RecordSourcesBestEffortAsync(cancellationToken);
                 backoff.Reset();
                 consecutiveFailures = 0;
                 firstAttempt = false;
@@ -147,6 +205,16 @@ public sealed class ProviderManager : IHostedService, IDisposable
     {
         var message = exception.GetBaseException().Message.ReplaceLineEndings(" ").Trim();
         return message.Length <= 240 ? message : message[..237] + "...";
+    }
+
+    private async Task RecordSourcesBestEffortAsync(CancellationToken cancellationToken)
+    {
+        if (_products is null || !_products.CanPersist) return;
+        try { await _products.RecordSourcesAsync(GetStatuses(), cancellationToken); }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Could not persist the last-known source catalog");
+        }
     }
 
     private ProviderConfiguration FindConfiguration(string providerId) =>

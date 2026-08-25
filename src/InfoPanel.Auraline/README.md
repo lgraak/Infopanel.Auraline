@@ -1,6 +1,6 @@
 # InfoPanel.Auraline plugin
 
-This project is the thin Windows InfoPanel adapter for Auraline M4. It owns InfoPanel lifecycle/configuration, profile discovery, render-session leases, latest-frame consumption, and InfoPanel image publication. Resonance Signal consumption, waveform processing, rendering, color, smoothing, and idle-state visuals remain entirely in Auraline Host.
+This project is the thin Windows InfoPanel adapter for Auraline M5. It owns InfoPanel lifecycle/configuration, profile discovery, render-session leases, latest-frame consumption, and InfoPanel image publication. Resonance Signal consumption, waveform processing, rendering, profile revisions, color, smoothing, and idle-state visuals remain entirely in Auraline Host.
 
 ## Source layout
 
@@ -29,3 +29,7 @@ Remove the beta by exiting InfoPanel and deleting only `%ProgramData%\InfoPanel\
 - `waveform-2`: second independent output for different-size simultaneous display elements.
 
 InfoPanel sends replacement demand snapshots. For one output, the plugin selects the largest active area and owns one producer buffer/session. Binding two different-size items to the two output IDs creates independent exact-size sessions. Resize uses first-valid-frame handover before detaching the prior lease.
+
+When InfoPanel reads the plugin configuration properties, M5 performs a short bounded loopback catalog refresh. Friendly profile names are presented while the stored value retains the stable profile ID in brackets. Failure keeps the existing/fallback choice and never substitutes an unrelated profile. A Host-side profile save hot-applies through the existing session; the plugin does not renegotiate or rerender.
+
+The Release M5 package is built and repository-tested. Local activation requires backing up and replacing only the four files in the Auraline plugin folder, then reloading the module or restarting InfoPanel. The required InfoPanel consumer-demand prerequisite remains a local unpublished checkpoint.

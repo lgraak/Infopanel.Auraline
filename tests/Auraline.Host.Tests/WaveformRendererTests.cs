@@ -1,4 +1,5 @@
 using Auraline.Host.Waveform;
+using Auraline.Host.Configuration;
 using SkiaSharp;
 
 namespace Auraline.Host.Tests;
@@ -76,6 +77,24 @@ public sealed class WaveformRendererTests
         Assert.Equal(96, decoded.Width);
         Assert.Equal(48, decoded.Height);
         Assert.Throws<ArgumentException>(() => renderer.EncodePng(rendered with { Pixels = [] }));
+    }
+
+    [Fact]
+    public void ProfileColorScaleAndSmoothingTruthfullyChangeRendererOutput()
+    {
+        var renderer = new WaveformRenderer();
+        var frame = new WaveformProcessedFrame("stream", 1, 1, 1, [0.2f, -0.2f, 0.2f, -0.2f], [[0.2f, -0.2f, 0.2f, -0.2f]]);
+        var automatic = new WaveformProfileSettings { Color = "#0000FF", SmoothingEnabled = false };
+        var fixedRed = automatic with { Color = "#FF0000", ScaleMode = WaveformScaleMode.Fixed, FixedScale = 2 };
+        var smoothed = fixedRed with { SmoothingEnabled = true, SmoothingAmount = 0.8 };
+
+        var automaticFrame = renderer.Render(frame, WaveformVisualizationState.Active, 160, 80, 1, DateTimeOffset.UtcNow, 30, 1, automatic);
+        var fixedFrame = renderer.Render(frame, WaveformVisualizationState.Active, 160, 80, 2, DateTimeOffset.UtcNow, 30, 1, fixedRed);
+        var smoothedFrame = renderer.Render(frame, WaveformVisualizationState.Active, 160, 80, 3, DateTimeOffset.UtcNow, 30, 1, smoothed);
+
+        Assert.False(automaticFrame.Pixels.SequenceEqual(fixedFrame.Pixels));
+        Assert.False(fixedFrame.Pixels.SequenceEqual(smoothedFrame.Pixels));
+        Assert.True(VerticalTraceSpan(fixedFrame) > VerticalTraceSpan(automaticFrame));
     }
 
     private static int VerticalTraceSpan(WaveformRenderedFrame frame)

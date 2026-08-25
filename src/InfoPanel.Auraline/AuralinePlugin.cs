@@ -22,6 +22,7 @@ public sealed class AuralinePlugin : BasePlugin, IPluginConfigurable, IPluginIma
     private readonly PluginText _frame = new("frame", "Latest Frame", "-");
     private readonly PluginText _reconnects = new("reconnects", "Reconnect Count", "0");
     private readonly PluginText _lastError = new("last_error", "Last Error", "-");
+    private readonly Func<Uri, CancellationToken, Task<AuralineProfileCatalog>> _profileCatalogLoader;
     private AuralinePluginRuntime? _runtime;
     private IReadOnlyList<PluginImageConsumerDemand> _demands = [];
     private string _endpoint = DefaultEndpoint;
@@ -30,11 +31,21 @@ public sealed class AuralinePlugin : BasePlugin, IPluginConfigurable, IPluginIma
     private DateTimeOffset _nextDiagnosticsUpdateUtc = DateTimeOffset.MinValue;
 
     public AuralinePlugin()
+        : this(async (endpoint, cancellationToken) =>
+        {
+            using var client = new AuralineHostClient(endpoint);
+            return await client.GetProfilesAsync(cancellationToken).ConfigureAwait(false);
+        })
+    {
+    }
+
+    internal AuralinePlugin(Func<Uri, CancellationToken, Task<AuralineProfileCatalog>> profileCatalogLoader)
         : base(
             "auraline-plugin",
             "Auraline",
             "Displays waveform frames rendered by the local Auraline Host.")
     {
+        _profileCatalogLoader = profileCatalogLoader;
     }
 
     // InfoPanel waits this interval after UpdateAsync completes. Wake at a bounded
@@ -54,7 +65,7 @@ public sealed class AuralinePlugin : BasePlugin, IPluginConfigurable, IPluginIma
         {
             lock (_gate)
             {
-                var profiles = _runtime?.GetProfiles() ?? [];
+                var profiles = LoadConfigurationProfiles(_runtime?.GetProfiles() ?? []);
                 var selected = profiles.FirstOrDefault(profile =>
                     string.Equals(profile.ProfileId, _profileId, StringComparison.Ordinal));
                 var options = profiles.Select(ProfileChoice.Format).ToArray();
@@ -214,4 +225,18 @@ public sealed class AuralinePlugin : BasePlugin, IPluginConfigurable, IPluginIma
 
     private static ImageConsumerDemand ToCoreDemand(PluginImageConsumerDemand demand) =>
         new(demand.ImageId, demand.ConsumerId, demand.Width, demand.Height);
+
+    private IReadOnlyList<AuralineProfileSummary> LoadConfigurationProfiles(IReadOnlyList<AuralineProfileSummary> fallback)
+    {
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+            var catalog = _profileCatalogLoader(new Uri(_endpoint), timeout.Token).GetAwaiter().GetResult();
+            return catalog.Profiles.Count == 0 ? fallback : catalog.Profiles;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidDataException or AuralineHostException)
+        {
+            return fallback;
+        }
+    }
 }

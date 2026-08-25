@@ -9,7 +9,7 @@ public sealed class ConfigurationAndPortabilityTests
     [Fact]
     public void PluginLifecycleAndDefaultsMatchCurrentInfoPanelContract()
     {
-        var plugin = new AuralinePlugin();
+        var plugin = new AuralinePlugin((_, _) => Task.FromResult(DefaultCatalog()));
 
         Assert.Equal(TimeSpan.FromMilliseconds(1000d / (30 * 2d)), plugin.UpdateInterval);
         Assert.Equal([AuralinePlugin.PrimaryImageId, AuralinePlugin.SecondaryImageId],
@@ -23,6 +23,29 @@ public sealed class ConfigurationAndPortabilityTests
         plugin.ApplyConfig("TargetFps", "60");
         Assert.Equal(TimeSpan.FromMilliseconds(1000d / (60 * 2d)), plugin.UpdateInterval);
         plugin.Close();
+    }
+
+    [Fact]
+    public void ConfigurationChoicesRefreshPersistentProfilesAndPreserveStableSelectionAcrossRename()
+    {
+        var friendlyName = "Purple Wave";
+        var plugin = new AuralinePlugin((_, _) => Task.FromResult(new AuralineProfileCatalog(
+            ContractVersion.Current,
+            "1.0.0-m5",
+            [
+                new(AuralineProfiles.DefaultProfileId, "Default Waveform", true, "waveform", "available"),
+                new("stable-purple", friendlyName, false, "waveform", "available")
+            ])));
+
+        var initial = plugin.ConfigProperties.Single(property => property.Key == "Profile");
+        Assert.NotNull(initial.Options);
+        Assert.Contains("Purple Wave [stable-purple]", initial.Options);
+        plugin.ApplyConfig("Profile", "Purple Wave [stable-purple]");
+        friendlyName = "Renamed Purple";
+
+        var refreshed = plugin.ConfigProperties.Single(property => property.Key == "Profile");
+        Assert.Equal("Renamed Purple [stable-purple]", refreshed.Value);
+        Assert.Equal("stable-purple", ProfileChoice.ParseProfileId(refreshed.Value?.ToString()));
     }
 
     [Fact]
@@ -106,4 +129,9 @@ public sealed class ConfigurationAndPortabilityTests
         }
         throw new DirectoryNotFoundException("Unable to locate repository root.");
     }
+
+    private static AuralineProfileCatalog DefaultCatalog() => new(
+        ContractVersion.Current,
+        "1.0.0-m5",
+        [new(AuralineProfiles.DefaultProfileId, "Default Waveform", true, "waveform", "available")]);
 }

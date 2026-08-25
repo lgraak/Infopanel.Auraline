@@ -1,6 +1,7 @@
 using Auraline.Contracts;
 using Auraline.Host.RenderSessions;
 using Auraline.Host.Waveform;
+using Auraline.Host.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Auraline.Host.Tests;
@@ -136,18 +137,56 @@ public sealed class RenderSessionManagerTests
         Assert.Equal(now + interval, next);
     }
 
+    [Fact]
+    public async Task SavedProfileRevisionHotAppliesWithoutReplacingActiveSession()
+    {
+        var fixture = new Fixture();
+        var profiles = new MutableProfiles();
+        await using var manager = new RenderSessionManager(
+            fixture.TransportFactory,
+            new FakeWaveformSource(),
+            new WaveformRenderer(),
+            new SystemRenderSessionClock(),
+            new RenderSessionOptions(32, TimeSpan.FromSeconds(25), TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(1)),
+            NullLogger<RenderSessionManager>.Instance,
+            profiles);
+        var attachment = manager.Attach(ProductDefaults.DefaultProfileId, 320, 120, 30, ContractVersion.Current);
+        Assert.True(SpinWait.SpinUntil(() => fixture.TransportFactory.PublishedCount > 0, TimeSpan.FromSeconds(2)));
+
+        profiles.Profile = profiles.Profile with { Revision = 2, Waveform = profiles.Profile.Waveform with { Color = "#FF0000" } };
+
+        Assert.True(SpinWait.SpinUntil(() => manager.GetDiagnostic(attachment.Session.SessionId)?.HotApplyCount == 1, TimeSpan.FromSeconds(2)));
+        var diagnostic = manager.GetDiagnostic(attachment.Session.SessionId)!;
+        Assert.Equal(2, diagnostic.ProfileRevision);
+        Assert.Equal(attachment.Session.SessionId, diagnostic.SessionId);
+    }
+
     private sealed class Fixture(int cap = 32)
     {
         public FakeClock Clock { get; } = new();
         public FakeTransportFactory TransportFactory { get; } = new();
 
-        public RenderSessionManager CreateManager() => new(
+        public RenderSessionManager CreateManager(IProfileCatalog? profiles = null) => new(
             TransportFactory,
             new FakeWaveformSource(),
             new WaveformRenderer(),
             Clock,
             new RenderSessionOptions(cap, TimeSpan.FromSeconds(25), TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(1)),
-            NullLogger<RenderSessionManager>.Instance);
+            NullLogger<RenderSessionManager>.Instance,
+            profiles);
+    }
+
+    private sealed class MutableProfiles : IProfileCatalog
+    {
+        public ProfileDefinition Profile { get; set; } = new()
+        {
+            Id = ProductDefaults.DefaultProfileId,
+            FriendlyName = "Default Waveform",
+            SourceGroupId = ProductDefaults.DefaultSourceGroupId
+        };
+
+        public IReadOnlyList<ProfileDefinition> GetProfiles() => [Profile];
+        public ProfileDefinition GetProfile(string profileId) => profileId == Profile.Id ? Profile : throw new KeyNotFoundException();
     }
 
     private sealed class FakeClock : IRenderSessionClock

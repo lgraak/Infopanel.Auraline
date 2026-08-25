@@ -11,3 +11,4 @@ These records preserve the small set of high-value decisions that establish Aura
 | [0005](0005-shared-memory-frame-transport.md) | Shared memory for v1 local frame transport | Accepted |
 | [0006](0006-windows-first-cross-platform-boundaries.md) | Windows-first implementation with cross-platform boundaries | Accepted |
 | [0007](0007-auraline-frame-transport-abstraction.md) | Keep Auraline frame transport abstract across OS boundaries | Accepted |
+| [0008](0008-persistent-profile-configuration.md) | Persistent profiles and saved-revision hot apply | Accepted |

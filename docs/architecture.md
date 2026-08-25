@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-This document records the architecture for InfoPanel.Auraline. M1 implemented the Windows tray Host and provider foundation, M2 added the Host-owned waveform engine, M3 added render sessions plus Windows local frame transport, and M4 implements the thin Windows InfoPanel consumer. M4 direct runtime acceptance passed against the matching local Windows prerequisite; repository implementation, local activation, and public InfoPanel availability remain separate states.
+This document records the architecture for InfoPanel.Auraline. M1 implemented the Windows tray Host and provider foundation, M2 added the Host-owned waveform engine, M3 added render sessions plus Windows local frame transport, M4 implemented the thin Windows InfoPanel consumer, and M5 implements persistent product configuration plus the loopback management UI. M4 direct runtime acceptance passed against the matching local Windows prerequisite; repository implementation, local activation, and public InfoPanel availability remain separate states.
 
 ## Product and component boundaries
 
@@ -69,7 +69,7 @@ Auraline Host is a Windows-specific `WinExe` tray application, not a Windows ser
 
 The Host web/API surface binds explicitly to `http://127.0.0.1:48481` by default and does not require authentication while it remains local-only. State-changing browser requests reject cross-site origins/fetch context so another website cannot silently submit the local forms. Provider endpoints in M1 configuration are likewise limited to numeric HTTP loopback addresses. Any future LAN exposure requires authentication before enablement and should also define appropriate transport security. The Windows composition root supplies platform paths, autostart, single-instance coordination, tray, and browser services; reusable configuration/provider/web logic consumes platform-neutral values or interfaces. See [ADR-0003](decisions/0003-host-process-and-api-boundary.md).
 
-The long-term installer target is `C:\Program Files\Auraline\`. M1 stores schema-versioned JSON at `%LOCALAPPDATA%\Auraline\config\host.json` and bounded rolling logs under `%LOCALAPPDATA%\Auraline\logs\`. Configuration writes use a same-directory temporary file and atomic replacement. Malformed configuration is preserved, reported, and not overwritten by later settings actions. See [ADR-0004](decisions/0004-per-user-json-configuration.md).
+The long-term installer target is `C:\Program Files\Auraline\`. M1 stores schema-versioned Host settings and provider definitions at `%LOCALAPPDATA%\Auraline\config\host.json` and bounded rolling logs under `%LOCALAPPDATA%\Auraline\logs\`. M5 preserves that schema for migration and adds `catalog.json`, `sources.json`, and independently replaceable `source-groups/<id>.json` and `profiles/<id>.json` documents. Configuration writes use a same-directory temporary file, flush, and atomic replacement. Malformed product configuration is preserved, reported, and not overwritten; a safe in-memory bootstrap remains available for diagnosis but persistence fails closed until the file is corrected. See [ADR-0004](decisions/0004-per-user-json-configuration.md) and [ADR-0008](decisions/0008-persistent-profile-configuration.md).
 
 ## Domain model
 
@@ -111,17 +111,17 @@ Discovery supplies opaque `source_id`, nullable `display_name`, `kind`, `availab
 
 Source groups have stable IDs and friendly names. One default source group is bootstrapped. There is no source-group `Enabled` state in v1.
 
-The model permits future groups to span providers and to configure per-source gain. V1 uses equal gain with automatic normalization. If some members of a future group disappear, rendering continues with surviving sources while the group is visibly marked degraded.
+M5 persists logical Default Playback, explicit-source, multi-source, and cross-provider members. Resolution prefers exact provider/source identity and then a unique high-confidence provider-scoped name/kind match; ambiguous matches remain unresolved. Last-known source snapshots survive provider outages and are labelled stale/offline. The current waveform runtime deliberately accepts only the single local logical Default Playback group. Other valid groups remain configurable but preview/session attach rejects them clearly until mixing exists.
 
 ### Profiles
 
-Profiles have stable IDs and friendly names, reference one source group, and own visualization/rendering configuration. They are reusable and have no `Enabled` state in v1. One default profile always exists. InfoPanel bindings store stable profile IDs, never mutable display names.
+Profiles have stable IDs and friendly names, reference one source group, and own visualization/rendering configuration. They are reusable and have no `Enabled` state in v1. One default profile always exists. M5 persists a monotonic revision plus trace color, centered-line, automatic/fixed scale, bounded smoothing, 30/60 FPS, and transparent-background settings. The browser editor owns an unsaved working copy; preview renders that copy through the real renderer without changing persistence or sessions. Save atomically increments the revision and active sessions read the latest saved settings without changing their session ID, leases, geometry, cadence key, or transport mapping. InfoPanel bindings store stable profile IDs, never mutable display names.
 
 ### Render sessions and consumers
 
 Consumers request render sessions from the Host. A session is keyed by at least profile and output dimensions; identical compatible requests may share a session. Consumers receive rendered frames and health metadata without taking ownership of rendering logic.
 
-M3 uses `default-profile` as the stable temporary profile identity. Compatibility includes requested target cadence, so a 30 FPS and 60 FPS request need not share even when profile/dimensions match. Attaching creates a distinct 25-second lease. Heartbeat renews only that lease; explicit detach or expiry removes only that consumer. Zero leases place the session in a 15-second grace state while rendering and transport allocation remain available. Reattach cancels grace and reuses the session.
+M3 introduced `default-profile`; M5 preserves it as the stable bootstrap identity while making the catalog persistent and editable. Compatibility includes requested target cadence, so a 30 FPS and 60 FPS request need not share even when profile/dimensions match. Attaching creates a distinct 25-second lease. Heartbeat renews only that lease; explicit detach or expiry removes only that consumer. Zero leases place the session in a 15-second grace state while rendering and transport allocation remain available. Reattach cancels grace and reuses the session.
 
 The default safety cap is 32 sessions. At capacity, zero-consumer sessions are ordered by last access and stable session ID and the oldest is evicted. Actively referenced sessions are never evicted; a new unique request fails clearly when every allowed session has a valid lease.
 
@@ -162,6 +162,8 @@ Windows layout version 1 contains a 128-byte header followed by two fixed-capaci
 
 M4 adds consumer-side orchestration without changing that layout. InfoPanel reports replacement demand snapshots keyed by image output and independent consumer. One plugin output selects its largest demand because InfoPanel owns one producer buffer per image ID; the plugin exposes a second output so two different exact dimensions can be active simultaneously. A new dimension request attaches a new immutable Host session, waits for its first valid frame, resizes/publishes the InfoPanel buffer, then detaches the old lease. Compatible requests share Host sessions and render loops through M3 semantics.
 
+M5 keeps the M3/M4 session and transport contracts unchanged. The InfoPanel configuration property refreshes the current Host catalog with a short bounded loopback request, presents friendly names, and persists stable IDs. A saved profile revision is observed inside the existing session render loop; revision and hot-apply count are diagnostic evidence rather than compatibility keys.
+
 The plugin polls only at its configured 30 or 60 FPS cadence, ignores unchanged transport sequence, heartbeats every eight seconds, and treats a non-advancing session as lost after two seconds. Brief failure retains the last valid frame for 1.5 seconds; afterward the InfoPanel adapter clears it to a transparent explicit unavailable surface. Host-rendered Idle, reconnecting, and source-unavailable frames pass through unchanged.
 
 ## Waveform v1 intent
@@ -173,8 +175,8 @@ The first renderer remains deliberately narrow:
 - transparent background;
 - one selectable solid trace color;
 - a fixed sensible line thickness;
-- automatic normalization;
-- basic smoothing sufficient to avoid flicker;
+- automatic normalization or a bounded fixed scale;
+- basic configurable spatial smoothing in addition to the existing signal smoothing;
 - internally fixed attack/decay behavior;
 - 30 FPS by default;
 - dynamic dimensions; and

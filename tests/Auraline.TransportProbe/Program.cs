@@ -10,7 +10,7 @@ var attachResponse = await client.PostAsJsonAsync("/api/v1/render-sessions/attac
 {
     contract_major = ContractVersion.Current.Major,
     contract_minor = ContractVersion.Current.Minor,
-    profile_id = AuralineProfiles.DefaultProfileId,
+    profile_id = options.ProfileId,
     width = options.Width,
     height = options.Height,
     target_fps = options.TargetFps
@@ -96,7 +96,7 @@ Console.WriteLine(JsonSerializer.Serialize(new
     detached = !options.Abrupt
 }));
 
-internal sealed record ProbeOptions(Uri BaseUri, int Width, int Height, int TargetFps, TimeSpan Duration, bool Abrupt)
+internal sealed record ProbeOptions(Uri BaseUri, string ProfileId, int Width, int Height, int TargetFps, TimeSpan Duration, bool Abrupt)
 {
     public static ProbeOptions Parse(string[] args)
     {
@@ -113,10 +113,11 @@ internal sealed record ProbeOptions(Uri BaseUri, int Width, int Height, int Targ
 
         var baseUri = new Uri(values.GetValueOrDefault("base-url", "http://127.0.0.1:48481"));
         if (!baseUri.IsLoopback) throw new ArgumentException("Probe base URL must be loopback.");
+        var profileId = values.GetValueOrDefault("profile-id", AuralineProfiles.DefaultProfileId);
         var width = int.Parse(values.GetValueOrDefault("width", "320"));
         var height = int.Parse(values.GetValueOrDefault("height", "120"));
         var fps = int.Parse(values.GetValueOrDefault("fps", "30"));
         var seconds = double.Parse(values.GetValueOrDefault("seconds", "4"), System.Globalization.CultureInfo.InvariantCulture);
-        return new ProbeOptions(baseUri, width, height, fps, TimeSpan.FromSeconds(seconds), values.ContainsKey("abrupt"));
+        return new ProbeOptions(baseUri, profileId, width, height, fps, TimeSpan.FromSeconds(seconds), values.ContainsKey("abrupt"));
     }
 }

@@ -1,5 +1,7 @@
 using System.Text.Json.Serialization;
 using Auraline.Contracts;
+using Auraline.Host.Configuration;
+using Auraline.Host.Providers;
 
 namespace Auraline.Host.RenderSessions;
 
@@ -15,17 +17,19 @@ public static class RenderSessionApi
 {
     public static void MapRenderSessionEndpoints(this WebApplication app)
     {
-        app.MapGet("/api/v1/profiles", () => Results.Json(new AuralineProfileCatalog(
+        app.MapGet("/api/v1/profiles", (ProductConfigurationStore catalog, ProviderManager providers) => Results.Json(new AuralineProfileCatalog(
             ContractVersion.Current,
             Web.HostStatusService.Version,
-            [new AuralineProfileSummary(
-                AuralineProfiles.DefaultProfileId,
-                "Default Waveform",
-                true,
-                "waveform",
-                "available")])));
+            catalog.GetProfiles().Select(profile => new AuralineProfileSummary(
+                profile.Id,
+                profile.FriendlyName,
+                catalog.Catalog.DefaultProfileId.Equals(profile.Id, StringComparison.OrdinalIgnoreCase),
+                profile.VisualizationType,
+                catalog.IsRuntimeSupported(profile)
+                    ? catalog.ResolveGroup(profile.SourceGroupId, providers.GetStatuses()).Availability
+                    : "unsupported-runtime")).ToArray())));
 
-        app.MapPost("/api/v1/render-sessions/attach", (AttachRenderSessionRequest request, RenderSessionManager sessions) =>
+        app.MapPost("/api/v1/render-sessions/attach", (AttachRenderSessionRequest request, RenderSessionManager sessions, ProductConfigurationStore catalog) =>
         {
             try
             {
@@ -33,7 +37,7 @@ public static class RenderSessionApi
                     request.ProfileId,
                     request.Width,
                     request.Height,
-                    request.TargetFps ?? 30,
+                    request.TargetFps ?? catalog.GetProfile(request.ProfileId).Waveform.TargetFps,
                     new ContractVersion(request.ContractMajor, request.ContractMinor));
                 return Results.Json(attachment, statusCode: StatusCodes.Status201Created);
             }

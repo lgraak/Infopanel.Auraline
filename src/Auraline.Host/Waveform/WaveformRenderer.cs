@@ -1,4 +1,5 @@
 using SkiaSharp;
+using Auraline.Host.Configuration;
 
 namespace Auraline.Host.Waveform;
 
@@ -29,16 +30,17 @@ public sealed class WaveformRenderer
         ulong frameSequence,
         DateTimeOffset renderTimestamp,
         int targetFps,
-        int sampleSeed)
+        int sampleSeed,
+        WaveformProfileSettings? settings = null)
     {
         ValidateDimensions(targetWidth, targetHeight);
-        var samples = SelectDisplaySamples(frame.MonoSamples, visualState, sampleSeed);
+        var samples = SelectDisplaySamples(frame.MonoSamples, visualState, sampleSeed, settings);
         var imageInfo = new SKImageInfo(targetWidth, targetHeight, SKColorType.Rgba8888, SKAlphaType.Premul);
         using var surface = SKSurface.Create(imageInfo);
         var canvas = surface.Canvas;
         canvas.Clear(SKColors.Empty);
 
-        var stroke = DetermineColor(visualState);
+        var stroke = DetermineColor(visualState, settings is null ? _baseColor : ParseColor(settings.Color));
         using var strokePaint = new SKPaint
         {
             Color = stroke,
@@ -92,12 +94,12 @@ public sealed class WaveformRenderer
         return encoded.ToArray();
     }
 
-    private SKColor DetermineColor(WaveformVisualizationState visualState)
+    private static SKColor DetermineColor(WaveformVisualizationState visualState, SKColor baseColor)
     {
         return visualState switch
         {
-            WaveformVisualizationState.Active => _baseColor,
-            WaveformVisualizationState.Idle => Dim(_baseColor, 130),
+            WaveformVisualizationState.Active => baseColor,
+            WaveformVisualizationState.Idle => Dim(baseColor, 130),
             WaveformVisualizationState.Reconnecting => new SKColor(255, 200, 80, 140),
             WaveformVisualizationState.Unavailable => new SKColor(180, 180, 190, 110),
             WaveformVisualizationState.Degraded => new SKColor(200, 120, 255, 140),
@@ -137,19 +139,39 @@ public sealed class WaveformRenderer
         return path;
     }
 
-    private static float[] SelectDisplaySamples(float[] samples, WaveformVisualizationState state, int frameCountReference)
+    private static float[] SelectDisplaySamples(float[] samples, WaveformVisualizationState state, int frameCountReference, WaveformProfileSettings? settings)
     {
         if (samples.Length == 0) return [];
-        if (state == WaveformVisualizationState.Active) return ApplyDeterministicScale(samples);
+        if (state == WaveformVisualizationState.Active)
+        {
+            var scaled = ApplyScale(samples, settings);
+            return settings is { SmoothingEnabled: true, SmoothingAmount: > 0 }
+                ? SmoothSpatially(scaled, settings.SmoothingAmount)
+                : scaled;
+        }
         return BuildIdleWave(Math.Max(32, samples.Length), frameCountReference);
     }
 
-    private static float[] ApplyDeterministicScale(float[] samples)
+    private static float[] ApplyScale(float[] samples, WaveformProfileSettings? settings)
     {
         if (samples.Length == 0) return [];
+        var multiplier = settings?.ScaleMode == WaveformScaleMode.Fixed
+            ? settings.FixedScale
+            : 0.85;
         var scaled = new float[samples.Length];
-        for (var i = 0; i < samples.Length; i++) scaled[i] = Math.Clamp(samples[i] * 0.85f, -1f, 1f);
+        for (var i = 0; i < samples.Length; i++) scaled[i] = Math.Clamp(samples[i] * (float)multiplier, -1f, 1f);
         return scaled;
+    }
+
+    private static float[] SmoothSpatially(float[] samples, double amount)
+    {
+        if (samples.Length < 2) return samples;
+        var output = new float[samples.Length];
+        output[0] = samples[0];
+        var retain = (float)Math.Clamp(amount, 0, 1) * 0.85f;
+        for (var i = 1; i < samples.Length; i++)
+            output[i] = output[i - 1] * retain + samples[i] * (1f - retain);
+        return output;
     }
 
     private static float[] BuildIdleWave(int sampleCount, int sequence)

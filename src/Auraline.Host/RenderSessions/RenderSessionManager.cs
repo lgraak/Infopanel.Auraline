@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json.Serialization;
 using Auraline.Contracts;
+using Auraline.Host.Configuration;
 using Auraline.Host.Waveform;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -40,6 +41,8 @@ public sealed record RenderSessionDiagnostic(
     [property: JsonPropertyName("width")] int Width,
     [property: JsonPropertyName("height")] int Height,
     [property: JsonPropertyName("target_fps")] int TargetFps,
+    [property: JsonPropertyName("profile_revision")] long ProfileRevision,
+    [property: JsonPropertyName("hot_apply_count")] long HotApplyCount,
     [property: JsonPropertyName("actual_fps")] double ActualFps,
     [property: JsonPropertyName("rendered_frames")] long RenderedFrames,
     [property: JsonPropertyName("published_sequence")] ulong PublishedSequence,
@@ -58,6 +61,7 @@ public sealed record RenderSessionDiagnostics(
     [property: JsonPropertyName("teardown_count")] long TeardownCount,
     [property: JsonPropertyName("eviction_count")] long EvictionCount,
     [property: JsonPropertyName("rejected_session_count")] long RejectedSessionCount,
+    [property: JsonPropertyName("hot_apply_count")] long HotApplyCount,
     [property: JsonPropertyName("sessions")] IReadOnlyList<RenderSessionDiagnostic> Sessions);
 
 public sealed class RenderSessionCapacityException(string message) : Exception(message);
@@ -72,6 +76,7 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
     private readonly IRenderSessionClock _clock;
     private readonly RenderSessionOptions _options;
     private readonly ILogger<RenderSessionManager> _logger;
+    private readonly IProfileCatalog? _profiles;
     private CancellationTokenSource? _maintenanceCancellation;
     private Task? _maintenanceTask;
     private long _creationCount;
@@ -86,7 +91,8 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
         WaveformRenderer renderer,
         IRenderSessionClock clock,
         RenderSessionOptions options,
-        ILogger<RenderSessionManager> logger)
+        ILogger<RenderSessionManager> logger,
+        IProfileCatalog? profiles = null)
     {
         if (options.SessionCap <= 0) throw new ArgumentOutOfRangeException(nameof(options));
         _transportFactory = transportFactory;
@@ -95,6 +101,7 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
         _clock = clock;
         _options = options;
         _logger = logger;
+        _profiles = profiles;
     }
 
     public RenderSessionAttachment Attach(string profileId, int width, int height, int targetFps, ContractVersion consumerVersion)
@@ -133,7 +140,7 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
 
                 evicted?.StopAsync().GetAwaiter().GetResult();
                 var transport = _transportFactory.Create(width, height, targetFps);
-                session = new SessionRuntime(lookupKey, transport, _waveform, _renderer, _clock, _logger, now);
+                session = new SessionRuntime(lookupKey, transport, _waveform, _renderer, _clock, _logger, _profiles, now);
                 _sessions.Add(lookupKey, session);
                 _creationCount++;
             }
@@ -197,12 +204,23 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
                 _teardownCount,
                 _evictionCount,
                 _rejectedCount,
+                sessions.Sum(item => item.HotApplyCount),
                 sessions);
         }
     }
 
     public RenderSessionDiagnostic? GetDiagnostic(string sessionId) =>
         GetDiagnostics().Sessions.FirstOrDefault(item => string.Equals(item.SessionId, sessionId, StringComparison.Ordinal));
+
+    public bool IsProfileInUse(string profileId)
+    {
+        lock (_gate)
+        {
+            ExpireLeasesLocked(_clock.UtcNow);
+            return _sessions.Values.Any(item =>
+                item.Leases.Count > 0 && item.LookupKey.SemanticKey.ProfileId.Equals(profileId, StringComparison.OrdinalIgnoreCase));
+        }
+    }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -280,8 +298,17 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
     {
         if (!ContractVersion.Current.IsCompatibleWith(consumerVersion))
             throw new NotSupportedException($"Unsupported render-session contract major version {consumerVersion.Major}.");
-        if (!string.Equals(profileId, AuralineProfiles.DefaultProfileId, StringComparison.Ordinal))
-            throw new KeyNotFoundException($"Unknown profile '{profileId}'.");
+        if (_profiles is null)
+        {
+            if (!string.Equals(profileId, AuralineProfiles.DefaultProfileId, StringComparison.Ordinal))
+                throw new KeyNotFoundException($"Unknown profile '{profileId}'.");
+        }
+        else
+        {
+            var profile = _profiles.GetProfile(profileId);
+            if (_profiles is ProductConfigurationStore products && !products.IsRuntimeSupported(profile))
+                throw new RenderSessionCapacityException("The selected source group is preserved but multi-source, cross-provider, and explicit-source rendering are not implemented in M5.");
+        }
         WaveformRenderer.ValidateDimensions(width, height);
         if (targetFps is not (30 or 60))
             throw new ArgumentOutOfRangeException(nameof(targetFps), "Target FPS must be 30 or 60.");
@@ -327,12 +354,15 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
         private readonly WaveformRenderer _renderer;
         private readonly IRenderSessionClock _clock;
         private readonly ILogger _logger;
+        private readonly IProfileCatalog? _profiles;
         private readonly CancellationTokenSource _cancellation = new();
         private Task? _renderTask;
         private long _renderedFrames;
         private ulong _sequence;
         private double? _latestDurationMs;
         private double? _averageDurationMs;
+        private long _profileRevision = 1;
+        private long _hotApplyCount;
 
         public SessionRuntime(
             SessionLookupKey lookupKey,
@@ -341,6 +371,7 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
             WaveformRenderer renderer,
             IRenderSessionClock clock,
             ILogger logger,
+            IProfileCatalog? profiles,
             DateTimeOffset createdAtUtc)
         {
             LookupKey = lookupKey;
@@ -349,6 +380,8 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
             _renderer = renderer;
             _clock = clock;
             _logger = logger;
+            _profiles = profiles;
+            if (_profiles is not null) _profileRevision = _profiles.GetProfile(lookupKey.SemanticKey.ProfileId).Revision;
             CreatedAtUtc = createdAtUtc;
             LastAccessUtc = createdAtUtc;
             SessionId = Guid.NewGuid().ToString("N");
@@ -371,6 +404,7 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
         public DateTimeOffset LastAccessUtc { get; set; }
         public DateTimeOffset? GraceExpiresAtUtc { get; set; }
         public RenderSessionState State { get; set; }
+        public long HotApplyCount { get { lock (_metricsGate) return _hotApplyCount; } }
 
         public void Start() => _renderTask ??= Task.Run(() => RenderAsync(_cancellation.Token), CancellationToken.None);
 
@@ -397,6 +431,8 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
                     LookupKey.SemanticKey.Width,
                     LookupKey.SemanticKey.Height,
                     LookupKey.TargetFps,
+                    _profileRevision,
+                    _hotApplyCount,
                     _renderedFrames / elapsed,
                     _renderedFrames,
                     _sequence,
@@ -419,6 +455,18 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
                 {
                     var stopwatch = Stopwatch.StartNew();
                     var snapshot = _waveform.CaptureRenderState();
+                    var profile = _profiles?.GetProfile(LookupKey.SemanticKey.ProfileId);
+                    if (profile is not null && profile.Revision != _profileRevision)
+                    {
+                        lock (_metricsGate)
+                        {
+                            if (profile.Revision != _profileRevision)
+                            {
+                                _profileRevision = profile.Revision;
+                                _hotApplyCount++;
+                            }
+                        }
+                    }
                     var sequence = checked(_sequence + 1);
                     var timestamp = _clock.UtcNow;
                     var rendered = _renderer.Render(
@@ -429,7 +477,8 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
                         sequence,
                         timestamp,
                         LookupKey.TargetFps,
-                        unchecked((int)sequence));
+                        unchecked((int)sequence),
+                        profile?.Waveform);
                     _transport.Publish(new FramePublication(
                         rendered.Width,
                         rendered.Height,
