@@ -1,22 +1,28 @@
 # InfoPanel.Auraline
 
-InfoPanel.Auraline is a Windows-first visualization platform that will turn portable audio data from [Resonance Signal](https://github.com/lgraak/resonance-signal) into reusable rendered visuals. The current executable support is Windows only; Linux binaries and integrations are not implemented or supported. Reusable product logic is intentionally kept behind cross-platform boundaries so Linux support can be added later without replacing the Auraline core. M1 now includes the executable Auraline Host foundation. Waveform rendering and the functional InfoPanel plugin begin in later milestones.
+InfoPanel.Auraline is a Windows-first visualization platform that turns portable audio data from [Resonance Signal](https://github.com/lgraak/resonance-signal) into reusable rendered visuals. The current executable support is Windows only; Linux binaries and integrations are not implemented or supported. Reusable product logic is intentionally kept behind cross-platform boundaries so Linux support can be added later without replacing the Auraline core.
 
-## What works in M1
+M2 implements the first Host-owned waveform engine while preserving the established boundaries.
 
-Auraline Host now runs as a single per-user Windows tray application. It has no normal application window and provides:
+## What works in M2
 
-- a loopback-only web UI and `GET /health` API;
-- human-readable per-user JSON configuration;
-- current-user Windows startup registration;
-- an enabled default provider named `Local Resonance Signal` at `127.0.0.1:48480`;
-- Resonance Signal v1 status and source discovery using `/v1/status` and `/v1/sources`;
-- provider enable, disable, reconnect, automatic retry, and source-refresh lifecycle;
-- Dashboard, Providers, Sources, Source Groups, Profiles, and Diagnostics navigation;
-- bounded rolling Serilog files; and
-- a small shared contract-version foundation.
+Auraline Host now runs as a single per-user Windows tray application and also:
 
-The Source Groups and Profiles pages are honest placeholders. M1 does not render or transport waveform frames and does not contain a functional InfoPanel integration.
+- runs a loopback-only web UI and `GET /health` API;
+- maintains human-readable per-user JSON configuration;
+- supports current-user Windows startup registration;
+- keeps an enabled default provider named `Local Resonance Signal` at `127.0.0.1:48480`;
+- performs Resonance Signal v1 status/source discovery via `/v1/status` and `/v1/sources`;
+- supports provider enable/disable, reconnect, and source refresh lifecycle;
+- runs Dashboard, Providers, Sources, Source Groups, Profiles, and Diagnostics navigation;
+- consumes and validates waveform protocol events and frames with `default-playback` intent;
+- decodes and processes channel-preserving waveform data into combined mono;
+- normalizes and smooths waveform frames for visual stability;
+- renders an oscilloscope-style centered waveform using SkiaSharp with transparent background;
+- tracks waveform metrics and exposes waveform health + intent metadata in `/health`, Dashboard, and Diagnostics;
+- runs bounded rolling Serilog logging.
+
+The Source Groups and Profiles pages remain placeholders. M2 is host-focused and does not include shared-memory transport, render sessions, stereo rendering, multi-source mixing, full profile editing, or functional InfoPanel runtime integration.
 
 ## Prerequisites
 
@@ -54,9 +60,13 @@ http://127.0.0.1:48481/
 
 Port `48481` is configurable in the JSON file and intentionally does not conflict with Resonance Signal's default `48480` port.
 
-On the first successful start, Auraline opens the Dashboard in the default browser and records that first-run completion. Later ordinary starts remain tray-only. The tray menu provides **Open Auraline**, **Reconnect Providers**, and **Exit**. Starting the executable again signals the existing per-user instance to open the UI and then exits the duplicate.
+On the first successful start, Auraline opens the Dashboard in the default browser and records first-run completion. Later ordinary starts remain tray-only. The tray menu provides **Open Auraline**, **Reconnect Providers**, and **Exit**. Starting the executable again signals the existing per-user instance to open the UI and then exits the duplicate.
 
 The Dashboard includes **Start Auraline with Windows** and System, Light, and Dark theme settings. Startup uses the current user's standard `Run` registry entry and requires no administrator privileges. A registration failure is shown on the Dashboard and does not crash the Host.
+
+### Observe the M2 waveform
+
+Start Resonance Signal on its default loopback listener, play audio through Windows Default Playback, and open `http://127.0.0.1:48481/diagnostics`. The Waveform Engine card reports the live stream metadata, state, counters, and render timing, and shows the latest `320x120` PNG snapshot produced by the real Host renderer. Refresh the page to update the snapshot; it is a bounded diagnostics preview, not the deferred M3 frame transport.
 
 ## Per-user files
 
@@ -84,12 +94,20 @@ Auraline consumes provider-owned source metadata and treats source IDs and disco
 src/Auraline.Host/          Windows tray Host plus reusable loopback, persistence, and provider logic
 src/Auraline.Contracts/     Host/plugin contract-version foundation without UI dependencies
 src/InfoPanel.Auraline/     Build-only plugin boundary; no functional integration yet
-tests/Auraline.Host.Tests/  Durable Host/config/provider lifecycle tests
+tests/Auraline.Host.Tests/  Durable Host/config/provider and waveform tests
 docs/                       Architecture, roadmap, decisions, handoffs, and standards
 ```
 
-## Current limitations and M2
+## Current limitations in M2
 
-M1 does not consume waveform frames, render a waveform, create render sessions, use shared-memory transport, mix sources, edit source groups/profiles, or integrate with InfoPanel at runtime. Channel count and sample rate remain blank in the Sources table because Resonance Signal v1 discovery does not expose them; those fields arrive with a waveform stream.
+M2 does not implement:
 
-M2 adds the first Host-owned waveform engine while preserving the provider, configuration, process, loopback, and platform boundaries established here. Waveform protocol, processing, render-state, renderer contracts, and metrics must remain OS-agnostic wherever technically reasonable. See the [architecture](docs/architecture.md), [roadmap](docs/roadmap.md), and [decision records](docs/decisions/README.md).
+- LAN-hosted API access;
+- render-session management and shared-memory transport;
+- functional InfoPanel runtime integration;
+- multi-source mixing and stereo render modes;
+- source-group/profile editing workflow.
+
+Source count, channel count, and sample rate in Sources are populated when a waveform stream starts. Channel/sample metadata return to null when stream telemetry is unavailable, which is expected behavior for this proof.
+
+For the full ownership and architecture intent, see [architecture](docs/architecture.md), [roadmap](docs/roadmap.md), and [decision records](docs/decisions/README.md).

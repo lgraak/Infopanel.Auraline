@@ -1,5 +1,6 @@
 using Auraline.Host.Configuration;
 using Auraline.Host.Lifecycle;
+using Auraline.Host.Waveform;
 using Auraline.Host.Platform;
 using Auraline.Host.Platform.Windows;
 using Auraline.Host.Providers;
@@ -54,6 +55,12 @@ public static class Program
             builder.Services.AddHttpClient("resonance-signal", client => client.Timeout = TimeSpan.FromSeconds(5));
             builder.Services.AddSingleton<ProviderManager>();
             builder.Services.AddHostedService(services => services.GetRequiredService<ProviderManager>());
+            builder.Services.AddSingleton<WaveformProcessor>();
+            builder.Services.AddSingleton<WaveformRenderer>();
+            builder.Services.AddSingleton<WaveformReconnectPolicy>();
+            builder.Services.AddSingleton<WaveformEngineService>();
+            builder.Services.AddSingleton<IWaveformEngineStatusProvider>(services => services.GetRequiredService<WaveformEngineService>());
+            builder.Services.AddHostedService(services => services.GetRequiredService<WaveformEngineService>());
             builder.Services.AddSingleton<IStartupRegistration, WindowsStartupRegistration>();
             builder.Services.AddSingleton<StartupRegistrationState>();
             builder.Services.AddSingleton<HostStatusService>();
@@ -120,6 +127,14 @@ public static class Program
     public static void MapEndpoints(WebApplication app)
     {
         app.MapGet("/health", (HostStatusService status) => Results.Json(status.GetHealth()));
+        app.MapGet("/waveform/preview.png", (HttpResponse response, IWaveformEngineStatusProvider waveform, WaveformRenderer renderer) =>
+        {
+            response.Headers.CacheControl = "no-store";
+            var frame = waveform.GetLatestFrame();
+            return frame is null
+                ? Results.NotFound()
+                : Results.Bytes(renderer.EncodePng(frame), "image/png");
+        });
         app.MapGet("/", (HostStatusService status, ConfigurationStore config, StartupRegistrationState startup) =>
             Results.Content(UiRenderer.Dashboard(status.GetHealth(), config.Current, startup.LastResult), "text/html"));
         app.MapGet("/providers", (ProviderManager providers, ConfigurationStore config) =>

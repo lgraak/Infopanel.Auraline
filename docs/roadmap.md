@@ -6,7 +6,7 @@ This roadmap describes intent, not shipped functionality. M4 is the first true e
 
 - [x] M0: Repository and architecture skeleton
 - [x] M1: Auraline Host core
-- [ ] M2: Waveform engine
+- [x] M2: Waveform engine
 - [ ] M3: Render-session and IPC layer
 - [ ] M4: InfoPanel.Auraline end-to-end integration
 - [ ] M5: Host configuration UI
@@ -25,6 +25,7 @@ Create the .NET 8 solution and executable Host foundation. Establish the provide
 ### M2: Waveform engine
 
 Implement and test the first Host-owned renderer: combined mono, centered trace, transparent background, selectable solid color, automatic normalization, basic smoothing, fixed attack/decay, dynamic dimensions, 30 FPS default, and explicit idle/reconnecting/disconnected states.
+M2 now includes a Host-owned websocket waveform path (`default-playback`), protocol validation, combined-mono DSP pipeline, SkiaSharp rendering, state machine, and a loopback diagnostics PNG snapshot of the real renderer output.
 
 ### M3: Render-session and IPC layer
 

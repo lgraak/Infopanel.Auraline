@@ -18,7 +18,7 @@ public sealed class ContractAndHealthTests
     public void HealthContractSerializesStableMachineReadableFields()
     {
         var health = new HealthContract("healthy", "1.0.0-m1", new(1, 1, 0, 1),
-            [new("provider-1", "Provider", true, "Reconnecting", 0, "connection refused")], null);
+            [new("provider-1", "Provider", true, "Reconnecting", 0, "connection refused")], null, null);
 
         using var document = JsonDocument.Parse(JsonSerializer.Serialize(health));
         var root = document.RootElement;

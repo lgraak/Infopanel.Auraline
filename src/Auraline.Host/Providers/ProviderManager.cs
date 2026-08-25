@@ -92,6 +92,12 @@ public sealed class ProviderManager : IHostedService, IDisposable
         }
     }
 
+    public void UpdateSourceMetadata(string providerId, string sourceId, int channelCount, int sampleRateHz)
+    {
+        var runtime = GetRuntime(providerId);
+        runtime.UpdateSourceMetadata(sourceId, channelCount, sampleRateHz);
+    }
+
     private void StartRuntime(Runtime runtime)
     {
         if (_hostCancellation is null || _hostCancellation.IsCancellationRequested || runtime.IsRunning) return;
@@ -214,6 +220,30 @@ public sealed class ProviderManager : IHostedService, IDisposable
                 _lastConnectedAt = DateTimeOffset.UtcNow;
                 _revision = result.DiscoveryRevision;
                 _sources = result.Sources;
+            }
+        }
+
+        public void UpdateSourceMetadata(string sourceId, int channelCount, int sampleRateHz)
+        {
+            lock (_gate)
+            {
+                if (_sources.Count == 0) return;
+                var hasAnyMatch = false;
+                var updated = new List<ProviderSource>(_sources.Count);
+                foreach (var source in _sources)
+                {
+                    if (source.SourceId.Equals(sourceId, StringComparison.Ordinal))
+                    {
+                        hasAnyMatch = true;
+                        updated.Add(source with { ChannelCount = channelCount, SampleRateHz = sampleRateHz });
+                    }
+                    else
+                    {
+                        updated.Add(source);
+                    }
+                }
+
+                if (hasAnyMatch) _sources = updated;
             }
         }
 

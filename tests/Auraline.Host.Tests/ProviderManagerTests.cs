@@ -83,6 +83,24 @@ public sealed class ProviderManagerTests : IDisposable
         manager.Dispose();
     }
 
+    [Fact]
+    public async Task UpdateSourceMetadataMutatesMatchingSourceInRuntimeCatalog()
+    {
+        var connector = new FakeConnector();
+        var (_, manager) = await CreateManagerAsync(connector);
+        await manager.StartAsync(default);
+        await WaitUntilAsync(() => manager.GetStatuses().Single().Sources.Count == 1);
+
+        var source = manager.GetStatuses().Single().Sources.Single();
+        manager.UpdateSourceMetadata(HostConfiguration.DefaultProviderId, source.SourceId, 2, 44100);
+        var updated = manager.GetStatuses().Single().Sources.Single();
+
+        Assert.Equal(2, updated.ChannelCount);
+        Assert.Equal(44100, updated.SampleRateHz);
+        await manager.StopAsync(default);
+        manager.Dispose();
+    }
+
     private async Task<(ConfigurationStore Store, ProviderManager Manager)> CreateManagerAsync(FakeConnector connector, bool enabled = true, IAsyncDelay? delay = null)
     {
         var store = new ConfigurationStore(AuralinePaths.FromRoot(_root));

@@ -2,13 +2,13 @@
 
 ## Status and scope
 
-This document records the initial architecture for InfoPanel.Auraline. M1 implements the Windows tray Host, loopback UI/API, per-user configuration, provider lifecycle, and source-discovery foundation. Rendering, render sessions, shared-memory transport, and functional InfoPanel integration remain planned for M2-M4.
+This document records the architecture for InfoPanel.Auraline. M1 implemented the Windows tray Host, loopback UI/API, per-user configuration, provider lifecycle, and source-discovery foundation. M2 adds the Host-owned waveform engine and keeps render sessions and functional InfoPanel integration planned for M3-M4.
 
 ## Product and component boundaries
 
 Resonance Signal is the audio-data provider and owns audio capture, Windows audio-device discovery, provider-side source identity, and provider protocol behavior. Auraline is a client of Resonance Signal. It must not duplicate provider responsibilities.
 
-Auraline Host is independent of InfoPanel and will launch independently with Windows. It owns provider connections, the domain model, rendering, render sessions, configuration, diagnostics, and control surfaces. InfoPanel.Auraline launches with InfoPanel and remains as thin as practical: it binds to a stable profile ID, negotiates a render session, transports frames, and displays them. It does not process waveform samples or contain product/rendering logic.
+Auraline Host is independent of InfoPanel and launches independently with Windows. It owns provider connections, the domain model, waveform processing/rendering, configuration, diagnostics, and control surfaces. InfoPanel.Auraline remains a planned thin layer that will bind to a stable profile ID, negotiate a render session, and display produced frames. It does not process waveform samples or contain product/rendering logic.
 
 ```text
 Resonance Signal
@@ -93,17 +93,17 @@ Initial configuration bootstraps an enabled provider named `Local Resonance Sign
 
 Sources are provider-owned observations with provider-authoritative identity and metadata. Auraline does not persist or reason from native Windows endpoint IDs.
 
-M1 implements provider states `Disabled`, `Disconnected`, `Connecting`, `Connected`, and `Reconnecting`. Enabled providers use a cancellable `500 ms`, `1 s`, `2 s`, `5 s` capped retry sequence. A successful status/discovery cycle resets provider backoff. A low-frequency 15-second status/discovery probe refreshes current provider evidence without producing successful-poll log spam. Disabled providers and Host shutdown cancel active waits.
+Provider states are `Disabled`, `Disconnected`, `Connecting`, `Connected`, and `Reconnecting`. Enabled providers use a cancellable `500 ms`, `1 s`, `2 s`, `5 s` capped retry sequence. A successful status/discovery cycle resets provider backoff. A low-frequency 15-second status/discovery probe refreshes provider evidence without producing successful-poll log spam. Disabled providers and Host shutdown cancel active waits.
 
 ### Current Resonance Signal v1 evidence
 
-M1 was implemented against Resonance Signal `main` at `1da75ecb771eebfec597aaa8d4c64f8863b46381` and its `docs/consumer-protocol.md`. The Host uses only:
+M2 validated against Resonance Signal `main` at `1da75ecb771eebfec597aaa8d4c64f8863b46381` and its `docs/consumer-protocol.md` for waveform protocol compatibility. The Host uses:
 
 - `GET /v1/status` for readiness and protocol version 1;
-- `GET /v1/sources` for complete replaceable discovery snapshots; and
-- the documented loopback endpoint root, defaulting to `http://127.0.0.1:48480`.
+- `GET /v1/sources` for replaceable discovery snapshots; and
+- `/v1/waveform` using loopback endpoint root defaults to `http://127.0.0.1:48480`.
 
-Discovery supplies opaque `source_id`, nullable `display_name`, `kind`, `availability`, point-in-time `default_playback`, and `supported_products`. It does not supply channel count or sample rate; those are therefore nullable Host source metadata until a later waveform `stream_started` event. M1 does not open `/v1/waveform` as a probe and does not persist the current-run source catalog because the provider contract does not define snapshot persistence as durable identity state. A non-v1 provider response is surfaced as an explicit compatibility failure.
+Discovery supplies opaque `source_id`, nullable `display_name`, `kind`, `availability`, point-in-time `default_playback`, and `supported_products`. It does not define channel count or sample rate in discovery snapshots; those values are now populated from waveform `stream_started` events once a stream is active.
 
 ### Source groups
 
@@ -142,7 +142,7 @@ Provider/source rebinding is conservative: exact identity is preferred, high-con
 
 ## Rendering and session architecture
 
-The Host performs all rendering; the InfoPanel plugin does not process waveform samples. Rendering accepts dynamic dimensions.
+The Host performs all rendering; the InfoPanel plugin does not process waveform samples. Rendering accepts dynamic dimensions. M2 exposes the latest rendered frame as a no-cache PNG on the loopback diagnostics surface solely for live inspection; it encodes the real renderer output and is not a render session or frame-transport contract.
 
 Render sessions are created lazily and are keyed by at least profile plus dimensions. Compatible sessions may be shared. The intended v1 high-rate local frame transport is one shared-memory buffer per active render session, behind an abstraction that can later support network transport. Localhost HTTP remains appropriate for lower-rate metadata and control. See [ADR-0005](decisions/0005-shared-memory-frame-transport.md).
 
