@@ -1,0 +1,228 @@
+using System.Collections.Concurrent;
+using Auraline.Host.Configuration;
+
+namespace Auraline.Host.Providers;
+
+public sealed class ProviderManager : IHostedService, IDisposable
+{
+    internal static readonly TimeSpan ConnectedProbeInterval = TimeSpan.FromSeconds(15);
+
+    private readonly ConfigurationStore _configuration;
+    private readonly IProviderConnector _connector;
+    private readonly IAsyncDelay _delay;
+    private readonly ILogger<ProviderManager> _logger;
+    private readonly ConcurrentDictionary<string, Runtime> _runtimes = new(StringComparer.OrdinalIgnoreCase);
+    private CancellationTokenSource? _hostCancellation;
+
+    public ProviderManager(ConfigurationStore configuration, IProviderConnector connector, IAsyncDelay delay, ILogger<ProviderManager> logger)
+    {
+        _configuration = configuration;
+        _connector = connector;
+        _delay = delay;
+        _logger = logger;
+    }
+
+    public IReadOnlyList<ProviderStatus> GetStatuses() => _runtimes.Values.Select(runtime => runtime.Snapshot()).OrderBy(p => p.FriendlyName).ToArray();
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        _hostCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        foreach (var provider in _configuration.Current.Providers)
+        {
+            var runtime = _runtimes.GetOrAdd(provider.Id, _ => new Runtime(provider));
+            if (provider.Enabled) StartRuntime(runtime);
+        }
+        return Task.CompletedTask;
+    }
+
+    public async Task StopAsync(CancellationToken cancellationToken)
+    {
+        _hostCancellation?.Cancel();
+        var tasks = _runtimes.Values.Select(runtime => runtime.StopAsync()).ToArray();
+        await Task.WhenAll(tasks).WaitAsync(cancellationToken);
+    }
+
+    public async Task SetEnabledAsync(string providerId, bool enabled, CancellationToken cancellationToken = default)
+    {
+        var provider = FindConfiguration(providerId) with { Enabled = enabled };
+        await _configuration.UpdateAsync(current => current with
+        {
+            Providers = current.Providers.Select(item => item.Id.Equals(providerId, StringComparison.OrdinalIgnoreCase) ? provider : item).ToList()
+        }, cancellationToken);
+
+        var runtime = _runtimes.GetOrAdd(provider.Id, _ => new Runtime(provider));
+        runtime.UpdateConfiguration(provider);
+        if (enabled) StartRuntime(runtime);
+        else
+        {
+            await runtime.StopAsync();
+            runtime.SetState(ProviderLifecycleState.Disabled, null);
+            _logger.LogInformation("Provider {ProviderId} disabled", providerId);
+        }
+    }
+
+    public async Task ReconnectAsync(string providerId)
+    {
+        var runtime = GetRuntime(providerId);
+        if (!runtime.Snapshot().Enabled) return;
+        await runtime.StopAsync();
+        runtime.SetState(ProviderLifecycleState.Disconnected, runtime.Snapshot().LastError);
+        StartRuntime(runtime);
+        _logger.LogInformation("Manual reconnect requested for provider {ProviderId}", providerId);
+    }
+
+    public async Task RefreshSourcesAsync(string providerId, CancellationToken cancellationToken = default)
+    {
+        var runtime = GetRuntime(providerId);
+        var snapshot = runtime.Snapshot();
+        if (!snapshot.Enabled || snapshot.State != ProviderLifecycleState.Connected)
+            throw new InvalidOperationException("Sources can only be refreshed for a connected, enabled provider.");
+        try
+        {
+            var result = await _connector.ConnectAndDiscoverAsync(runtime.Configuration, cancellationToken);
+            runtime.SetConnected(result);
+            _logger.LogInformation("Refreshed {SourceCount} sources for provider {ProviderId}", result.Sources.Count, providerId);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            runtime.SetState(ProviderLifecycleState.Reconnecting, ConciseError(ex));
+            _logger.LogWarning(ex, "Manual source refresh failed for provider {ProviderId}", providerId);
+            await ReconnectAsync(providerId);
+            throw;
+        }
+    }
+
+    private void StartRuntime(Runtime runtime)
+    {
+        if (_hostCancellation is null || _hostCancellation.IsCancellationRequested || runtime.IsRunning) return;
+        runtime.Start(token => RunAsync(runtime, token), _hostCancellation.Token);
+    }
+
+    private async Task RunAsync(Runtime runtime, CancellationToken cancellationToken)
+    {
+        var backoff = new ReconnectBackoff();
+        var firstAttempt = true;
+        var consecutiveFailures = 0;
+        while (!cancellationToken.IsCancellationRequested && runtime.Configuration.Enabled)
+        {
+            var beforeAttempt = runtime.Snapshot();
+            if (beforeAttempt.State != ProviderLifecycleState.Connected)
+                runtime.SetState(firstAttempt ? ProviderLifecycleState.Connecting : ProviderLifecycleState.Reconnecting, beforeAttempt.LastError);
+            try
+            {
+                var result = await _connector.ConnectAndDiscoverAsync(runtime.Configuration, cancellationToken);
+                runtime.SetConnected(result);
+                backoff.Reset();
+                consecutiveFailures = 0;
+                firstAttempt = false;
+                if (beforeAttempt.State != ProviderLifecycleState.Connected)
+                    _logger.LogInformation("Provider {ProviderId} connected; discovered {SourceCount} sources", runtime.Configuration.Id, result.Sources.Count);
+                await _delay.DelayAsync(ConnectedProbeInterval, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { break; }
+            catch (Exception ex)
+            {
+                var error = ConciseError(ex);
+                runtime.SetState(ProviderLifecycleState.Reconnecting, error);
+                var retryDelay = backoff.NextDelay();
+                consecutiveFailures++;
+                if (consecutiveFailures <= 4 || (consecutiveFailures - 4) % 12 == 0)
+                    _logger.LogWarning("Provider {ProviderId} unavailable ({Reason}); retrying in {RetryDelay}", runtime.Configuration.Id, error, retryDelay);
+                try { await _delay.DelayAsync(retryDelay, cancellationToken); }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { break; }
+                firstAttempt = false;
+            }
+        }
+        if (!runtime.Configuration.Enabled) runtime.SetState(ProviderLifecycleState.Disabled, null);
+        else if (runtime.Snapshot().State != ProviderLifecycleState.Disabled) runtime.SetState(ProviderLifecycleState.Disconnected, runtime.Snapshot().LastError);
+    }
+
+    private static string ConciseError(Exception exception)
+    {
+        var message = exception.GetBaseException().Message.ReplaceLineEndings(" ").Trim();
+        return message.Length <= 240 ? message : message[..237] + "...";
+    }
+
+    private ProviderConfiguration FindConfiguration(string providerId) =>
+        _configuration.Current.Providers.FirstOrDefault(p => p.Id.Equals(providerId, StringComparison.OrdinalIgnoreCase))
+        ?? throw new KeyNotFoundException($"Provider '{providerId}' was not found.");
+
+    private Runtime GetRuntime(string providerId) => _runtimes.TryGetValue(providerId, out var runtime)
+        ? runtime : throw new KeyNotFoundException($"Provider '{providerId}' was not found.");
+
+    public void Dispose()
+    {
+        _hostCancellation?.Dispose();
+        foreach (var runtime in _runtimes.Values) runtime.Dispose();
+    }
+
+    private sealed class Runtime : IDisposable
+    {
+        private readonly object _gate = new();
+        private ProviderConfiguration _configuration;
+        private ProviderLifecycleState _state;
+        private string? _lastError;
+        private DateTimeOffset? _lastConnectedAt;
+        private string? _revision;
+        private IReadOnlyList<ProviderSource> _sources = [];
+        private CancellationTokenSource? _cancellation;
+        private Task? _task;
+
+        public Runtime(ProviderConfiguration configuration)
+        {
+            _configuration = configuration;
+            _state = configuration.Enabled ? ProviderLifecycleState.Disconnected : ProviderLifecycleState.Disabled;
+        }
+
+        public ProviderConfiguration Configuration { get { lock (_gate) return _configuration; } }
+        public bool IsRunning { get { lock (_gate) return _task is { IsCompleted: false }; } }
+
+        public void UpdateConfiguration(ProviderConfiguration configuration) { lock (_gate) _configuration = configuration; }
+
+        public void Start(Func<CancellationToken, Task> body, CancellationToken hostCancellation)
+        {
+            lock (_gate)
+            {
+                if (_task is { IsCompleted: false }) return;
+                _cancellation?.Dispose();
+                _cancellation = CancellationTokenSource.CreateLinkedTokenSource(hostCancellation);
+                _task = Task.Run(() => body(_cancellation.Token), CancellationToken.None);
+            }
+        }
+
+        public async Task StopAsync()
+        {
+            Task? task;
+            lock (_gate) { _cancellation?.Cancel(); task = _task; }
+            if (task is not null)
+            {
+                try { await task; } catch (OperationCanceledException) { }
+            }
+        }
+
+        public void SetState(ProviderLifecycleState state, string? error)
+        {
+            lock (_gate) { _state = state; _lastError = error; }
+        }
+
+        public void SetConnected(ProviderConnectionResult result)
+        {
+            lock (_gate)
+            {
+                _state = ProviderLifecycleState.Connected;
+                _lastError = null;
+                _lastConnectedAt = DateTimeOffset.UtcNow;
+                _revision = result.DiscoveryRevision;
+                _sources = result.Sources;
+            }
+        }
+
+        public ProviderStatus Snapshot()
+        {
+            lock (_gate) return new(_configuration.Id, _configuration.FriendlyName, _configuration.Endpoint,
+                _configuration.Enabled, _state, _lastError, _lastConnectedAt, _revision, _sources.ToArray());
+        }
+
+        public void Dispose() => _cancellation?.Dispose();
+    }
+}

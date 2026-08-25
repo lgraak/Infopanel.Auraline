@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-This document records the intended initial architecture for InfoPanel.Auraline. At M0 these components and behaviors are documented, not implemented. The first end-to-end proof is planned for M4.
+This document records the initial architecture for InfoPanel.Auraline. M1 implements the Windows tray Host, loopback UI/API, per-user configuration, provider lifecycle, and source-discovery foundation. Rendering, render sessions, shared-memory transport, and functional InfoPanel integration remain planned for M2-M4.
 
 ## Product and component boundaries
 
@@ -38,15 +38,15 @@ The initial implementation direction is:
 - Serilog for logging; and
 - Auraline.Contracts for contracts that genuinely need to be shared between the Host and plugin.
 
-These are settled initial directions unless implementation evidence exposes a concrete incompatibility. No packages or production dependencies are introduced in M0. See [ADR-0001](decisions/0001-initial-implementation-stack.md).
+These are settled initial directions unless implementation evidence exposes a concrete incompatibility. M1 uses ASP.NET Core and Windows Forms from the .NET 8 shared frameworks plus Serilog's ASP.NET Core and rolling-file packages. SkiaSharp remains deferred until rendering begins. See [ADR-0001](decisions/0001-initial-implementation-stack.md).
 
 ## Process, configuration, and storage
 
-Auraline Host will be a per-user tray application, not a Windows service. It will enforce a single Host instance per user and launch independently with Windows. First run will open the local web UI. Later starts will remain tray-only unless a critical startup failure needs to be surfaced.
+Auraline Host is a Windows-specific `WinExe` tray application, not a Windows service. A per-user named synchronization object admits one instance and a per-user named pipe lets a duplicate signal the primary instance to open the web UI. The first successful run opens the UI and persists completion; later starts remain tray-only. Current-user startup registration uses `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` and surfaces failure without terminating the Host.
 
-The Host web/API surface will bind only to localhost in v1 and will not require authentication while it remains local-only. Any future LAN exposure requires authentication before enablement and should also define appropriate transport security. See [ADR-0003](decisions/0003-host-process-and-api-boundary.md).
+The Host web/API surface binds explicitly to `http://127.0.0.1:48481` by default and does not require authentication while it remains local-only. State-changing browser requests reject cross-site origins/fetch context so another website cannot silently submit the local forms. Provider endpoints in M1 configuration are likewise limited to numeric HTTP loopback addresses. Any future LAN exposure requires authentication before enablement and should also define appropriate transport security. See [ADR-0003](decisions/0003-host-process-and-api-boundary.md).
 
-The long-term installer target is `C:\Program Files\Auraline\`. Per-user configuration, state, and logs belong under `%LOCALAPPDATA%\Auraline\`; v1 configuration will use human-readable JSON and does not need to roam between machines. See [ADR-0004](decisions/0004-per-user-json-configuration.md).
+The long-term installer target is `C:\Program Files\Auraline\`. M1 stores schema-versioned JSON at `%LOCALAPPDATA%\Auraline\config\host.json` and bounded rolling logs under `%LOCALAPPDATA%\Auraline\logs\`. Configuration writes use a same-directory temporary file and atomic replacement. Malformed configuration is preserved, reported, and not overwritten by later settings actions. See [ADR-0004](decisions/0004-per-user-json-configuration.md).
 
 ## Domain model
 
@@ -66,11 +66,23 @@ Consumers
 
 ### Providers and sources
 
-Multiple Resonance Signal providers are supported by design. Each provider has a stable ID, friendly name, endpoint, `Enabled` state, connection state, and last-error reason. Enabling a provider automatically reconnects it, and a successful connection automatically refreshes source discovery. Manual **Reconnect** and **Refresh Sources** actions are planned.
+Multiple Resonance Signal providers are supported by design. Each provider has a stable ID, friendly name, endpoint, `Enabled` state, connection state, and last-error reason. Enabling a provider automatically reconnects it, and a successful connection automatically refreshes source discovery. Manual **Reconnect** and **Refresh Sources** actions are implemented in the Providers page, and the tray can reconnect all enabled providers.
 
 Initial configuration bootstraps an enabled provider named `Local Resonance Signal` at `127.0.0.1:48480`. Bootstrap configuration may be created while the provider is offline.
 
 Sources are provider-owned observations with provider-authoritative identity and metadata. Auraline does not persist or reason from native Windows endpoint IDs.
+
+M1 implements provider states `Disabled`, `Disconnected`, `Connecting`, `Connected`, and `Reconnecting`. Enabled providers use a cancellable `500 ms`, `1 s`, `2 s`, `5 s` capped retry sequence. A successful status/discovery cycle resets provider backoff. A low-frequency 15-second status/discovery probe refreshes current provider evidence without producing successful-poll log spam. Disabled providers and Host shutdown cancel active waits.
+
+### Current Resonance Signal v1 evidence
+
+M1 was implemented against Resonance Signal `main` at `1da75ecb771eebfec597aaa8d4c64f8863b46381` and its `docs/consumer-protocol.md`. The Host uses only:
+
+- `GET /v1/status` for readiness and protocol version 1;
+- `GET /v1/sources` for complete replaceable discovery snapshots; and
+- the documented loopback endpoint root, defaulting to `http://127.0.0.1:48480`.
+
+Discovery supplies opaque `source_id`, nullable `display_name`, `kind`, `availability`, point-in-time `default_playback`, and `supported_products`. It does not supply channel count or sample rate; those are therefore nullable Host source metadata until a later waveform `stream_started` event. M1 does not open `/v1/waveform` as a probe and does not persist the current-run source catalog because the provider contract does not define snapshot persistence as durable identity state. A non-v1 provider response is surfaced as an explicit compatibility failure.
 
 ### Source groups
 

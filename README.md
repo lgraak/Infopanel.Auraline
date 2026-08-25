@@ -1,73 +1,95 @@
 # InfoPanel.Auraline
 
-InfoPanel.Auraline is a planned Windows visualization platform for turning audio data into reusable rendered visuals. The first integration will display a waveform in [InfoPanel](https://github.com/lanceseidman/InfoPanel), but the rendering host is intentionally designed as its own product rather than as plugin-only code.
+InfoPanel.Auraline is a Windows visualization platform that will turn portable audio data from [Resonance Signal](https://github.com/lgraak/resonance-signal) into reusable rendered visuals. M1 now includes the executable Auraline Host foundation. Waveform rendering and the functional InfoPanel plugin begin in later milestones.
 
-This repository currently contains the M0 architecture and repository skeleton only. It does **not** yet contain a working host, renderer, transport, configuration UI, or InfoPanel plugin.
+## What works in M1
 
-## How Auraline fits with Resonance Signal
+Auraline Host now runs as a single per-user Windows tray application. It has no normal application window and provides:
 
-[Resonance Signal](https://github.com/lgraak/resonance-signal) is the audio-data provider. It owns audio capture, Windows device discovery, source identity, and the provider protocol. Auraline consumes that protocol; it does not capture audio or choose Windows audio devices itself.
+- a loopback-only web UI and `GET /health` API;
+- human-readable per-user JSON configuration;
+- current-user Windows startup registration;
+- an enabled default provider named `Local Resonance Signal` at `127.0.0.1:48480`;
+- Resonance Signal v1 status and source discovery using `/v1/status` and `/v1/sources`;
+- provider enable, disable, reconnect, automatic retry, and source-refresh lifecycle;
+- Dashboard, Providers, Sources, Source Groups, Profiles, and Diagnostics navigation;
+- bounded rolling Serilog files; and
+- a small shared contract-version foundation.
 
-Auraline is split into two main runtime components:
+The Source Groups and Profiles pages are honest placeholders. M1 does not render or transport waveform frames and does not contain a functional InfoPanel integration.
 
-- **Auraline Host** will connect to providers, manage sources and profiles, render frames, expose localhost configuration/control, and own render-session transport. It will launch independently with Windows as a per-user tray application.
-- **InfoPanel.Auraline** will launch with InfoPanel and remain a thin display/transport adapter. It will select a profile and present frames produced by the Host rather than processing waveform samples itself.
+## Prerequisites
 
-Shared messages and models that genuinely need to cross that boundary will live in **Auraline.Contracts**.
+- Windows 10 or 11;
+- the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or a newer SDK able to target .NET 8; and
+- Resonance Signal running on `127.0.0.1:48480` for live provider discovery. The Host still starts and remains usable when the provider is offline.
 
-## First proof of concept
+## Build and test
 
-The first functional proof is intentionally narrow:
+From the repository root:
 
-1. Auraline Host connects to a local Resonance Signal provider using logical `default-playback` source intent.
-2. The Host renders a combined mono, centered oscilloscope-style waveform at dynamic dimensions.
-3. A render session publishes local frames for a thin InfoPanel.Auraline consumer.
-4. InfoPanel displays the resulting waveform end to end.
-
-That proof arrives in M4. The current M0 milestone establishes only the durable plan and boundaries for later implementation.
-
-## Architecture at a glance
-
-```text
-Resonance Signal
-    ↓
-Auraline Host
-    ↓
-profiles / source groups / render engine
-    ↓
-render-session transport
-    ↓
-InfoPanel.Auraline
-    ↓
-InfoPanel
+```powershell
+dotnet restore InfoPanel.Auraline.sln --configfile NuGet.Config
+dotnet build InfoPanel.Auraline.sln --configuration Debug --no-restore
+dotnet test InfoPanel.Auraline.sln --configuration Debug --no-build --no-restore
 ```
 
-Development initially targets Windows and .NET 8. The intended implementation uses C#, SkiaSharp, ASP.NET Core with a lightweight server-rendered UI, Serilog, and shared contracts where appropriate. The first visualization is a waveform; other renderers and generic or network consumers are deferred until after the proof of concept.
+Release build:
 
-The expected eventual installation layout is:
+```powershell
+dotnet build InfoPanel.Auraline.sln --configuration Release --no-restore
+```
 
-- Application binaries: `C:\Program Files\Auraline\`
-- Per-user configuration, state, and logs: `%LOCALAPPDATA%\Auraline\`
+## Run Auraline Host
+
+```powershell
+dotnet run --project src/Auraline.Host/Auraline.Host.csproj
+```
+
+The Host listens only on:
+
+```text
+http://127.0.0.1:48481/
+```
+
+Port `48481` is configurable in the JSON file and intentionally does not conflict with Resonance Signal's default `48480` port.
+
+On the first successful start, Auraline opens the Dashboard in the default browser and records that first-run completion. Later ordinary starts remain tray-only. The tray menu provides **Open Auraline**, **Reconnect Providers**, and **Exit**. Starting the executable again signals the existing per-user instance to open the UI and then exits the duplicate.
+
+The Dashboard includes **Start Auraline with Windows** and System, Light, and Dark theme settings. Startup uses the current user's standard `Run` registry entry and requires no administrator privileges. A registration failure is shown on the Dashboard and does not crash the Host.
+
+## Per-user files
+
+Mutable state never belongs in the source or installation directory:
+
+```text
+%LOCALAPPDATA%\Auraline\
+├─ config\host.json
+└─ logs\auraline-YYYYMMDD.log
+```
+
+Configuration uses schema version 1 and is written through a same-directory temporary file followed by atomic replacement. A malformed file is preserved unchanged; the Host starts with safe in-memory defaults, reports degraded configuration health, and blocks configuration writes until the file is repaired.
+
+Logs default to Information, roll daily or at 10 MB, and retain seven files. Auraline does not log audio samples, credentials, or secret material.
+
+## Provider behavior
+
+Enabled providers connect and discover sources automatically. An unavailable provider is shown as `Reconnecting` with a concise current-run reason while the Host and UI remain available. Retry delays follow `500 ms`, `1 s`, `2 s`, then cap at `5 s` indefinitely. Success resets the sequence. Disabling a provider or exiting the Host cancels its retry loop.
+
+Auraline consumes provider-owned source metadata and treats source IDs and discovery revisions as opaque. It does not enumerate Windows audio devices, retain native endpoint IDs, choose the Windows default endpoint, or assume a future active waveform stream can migrate.
 
 ## Repository layout
 
 ```text
+src/Auraline.Host/          Windows tray Host, loopback UI/API, persistence, and providers
+src/Auraline.Contracts/     Host/plugin contract-version foundation without UI dependencies
+src/InfoPanel.Auraline/     Build-only plugin boundary; no functional integration yet
+tests/Auraline.Host.Tests/  Durable Host/config/provider lifecycle tests
 docs/                       Architecture, roadmap, decisions, handoffs, and standards
-src/Auraline.Host/          Future independent rendering and configuration host
-src/Auraline.Contracts/     Future shared cross-component contracts
-src/InfoPanel.Auraline/     Future thin InfoPanel adapter
-tests/                      Future automated test projects
 ```
 
-## Development status
+## Current limitations and M2
 
-There is nothing to build or run at M0 because no .NET solution or project has been created yet. Build and test instructions will be added with the first executable milestone rather than claiming a workflow that does not exist.
+M1 does not consume waveform frames, render a waveform, create render sessions, use shared-memory transport, mix sources, edit source groups/profiles, or integrate with InfoPanel at runtime. Channel count and sample rate remain blank in the Sources table because Resonance Signal v1 discovery does not expose them; those fields arrive with a waveform stream.
 
-Start with:
-
-- [Architecture](docs/architecture.md)
-- [Roadmap](docs/roadmap.md)
-- [Architecture decisions](docs/decisions/README.md)
-- [Project prompt standard](docs/standards/ai-project-prompt-standard-v1.md)
-- [Project handoff standard](docs/standards/ai-project-handoff-standard-v1.md)
-- [Handoff history](docs/handoffs/)
+M2 adds the first Host-owned waveform engine while preserving the provider, configuration, process, and loopback boundaries established here. See the [architecture](docs/architecture.md), [roadmap](docs/roadmap.md), and [decision records](docs/decisions/README.md).

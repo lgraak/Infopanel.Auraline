@@ -5,7 +5,7 @@ This roadmap describes intent, not shipped functionality. M4 is the first true e
 ## Milestone checklist
 
 - [x] M0: Repository and architecture skeleton
-- [ ] M1: Auraline Host core
+- [x] M1: Auraline Host core
 - [ ] M2: Waveform engine
 - [ ] M3: Render-session and IPC layer
 - [ ] M4: InfoPanel.Auraline end-to-end integration
@@ -20,7 +20,7 @@ Establish approachable project documentation, architecture boundaries, decision 
 
 ### M1: Auraline Host core
 
-Create the .NET 8 solution and Host foundation. Establish the provider, source, source-group, and profile models; per-user JSON configuration; single-instance tray lifecycle; and the narrow Resonance Signal client behavior needed for logical Default Playback. Keep rendering and InfoPanel integration out of this milestone.
+Create the .NET 8 solution and executable Host foundation. Establish the provider/source catalog, per-user JSON configuration, single-instance tray lifecycle, loopback health/UI shell, bounded logging, Windows startup setting, and Resonance Signal v1 status/discovery lifecycle. Source-group/profile navigation is present but their editable models remain deferred. Rendering, waveform streaming, render sessions, and InfoPanel runtime integration remain out of M1.
 
 ### M2: Waveform engine
 
@@ -36,7 +36,7 @@ Build the thin InfoPanel adapter, bind it by stable profile ID, negotiate a rend
 
 ### M5: Host configuration UI
 
-Add the localhost-only ASP.NET Core control surface and lightweight server-rendered configuration UI for providers, discovery, source groups, profiles, health, and manual reconnect/refresh actions. Preserve the v1 local-only security boundary.
+Expand the M1 localhost-only ASP.NET Core status/control shell into the complete configuration UI for provider definition editing, source groups, profiles, and richer health. Preserve the v1 local-only security boundary; manual provider enable/disable, reconnect, refresh, startup, and theme controls already exist.
 
 ### M6: Diagnostics and beta readiness
 

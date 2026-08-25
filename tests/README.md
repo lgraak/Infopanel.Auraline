@@ -1,3 +1,5 @@
 # Tests
 
-Automated test projects will be added alongside the executable milestones they validate. There is no runtime code or test suite at M0.
+`Auraline.Host.Tests` covers M1 configuration bootstrap/load/save/validation, malformed-file preservation, provider transitions/reconnect/refresh/cancellation, retry policy, single-instance signaling, tray resources, cross-site POST rejection, Resonance Signal v1 integration parsing, health serialization, and contract compatibility.
+
+Rendering, render-session, transport, and functional plugin tests arrive with their implementation milestones.

@@ -14,3 +14,7 @@ Store per-user configuration, state, and logs under `%LOCALAPPDATA%\Auraline\`. 
 ## Consequences
 
 Configuration is supportable and easy to inspect without a database dependency. Schema evolution, atomic writes, validation, and secret handling must be designed when persistence is implemented; M0 does not define their mechanisms.
+
+## M1 implementation evidence
+
+Schema version 1 lives at `%LOCALAPPDATA%\Auraline\config\host.json`; rolling logs live beside it under `logs\`. Writes serialize to a same-directory temporary file and replace the destination atomically. Missing configuration bootstraps one stable local provider. Malformed or invalid configuration is preserved unchanged, reported through Host health/UI, and made read-only until repaired rather than silently reset.
