@@ -1,12 +1,12 @@
 # Auraline M0 Handoff
 
 Date: 2026-08-24 23:15:03 -07:00
-Status: Completed locally; publication pending
+Status: Completed and published
 Model: GPT-5 Codex (the packet requested GPT-5.3 Codex Spark, which is not the reported identity of this execution)
 Effort: Medium
 Repository: InfoPanel.Auraline at `D:\Aeons\Git\Infopanel.Auraline`
 Branch: `main`
-HEAD: unborn before M0; the resulting commit is the commit containing this handoff
+HEAD: `657f8d9ad27602e237a173c475b0e24d31c217bb` when publication evidence was captured
 Authoritative remote: `origin` at `https://github.com/lgraak/Infopanel.Auraline.git`
 
 > This handoff is a continuation checkpoint, not authoritative truth. Current
@@ -37,10 +37,10 @@ Establish the M0 repository and documentation skeleton for InfoPanel.Auraline. T
 
 ## Current Repository State
 
-- Branch and HEAD: `main`; the branch was unborn before M0, so there was no pre-existing commit SHA.
+- Branch and HEAD: `main` at `657f8d9ad27602e237a173c475b0e24d31c217bb` after the M0 root commit; the branch was unborn before M0, so there was no pre-existing commit SHA.
 - Working tree: only the two user-supplied untracked standards existed at preflight. All other M0 files listed below were created in this work packet.
 - Upstream and synchronization: local `main` was configured to merge `origin/main`; the authoritative remote had no branch refs after a successful fetch and `git ls-remote --heads origin`.
-- Commit and authoritative remote readback: publication was pending when this self-contained handoff was authored. The exact commit containing the handoff cannot be embedded in its own hashed contents; verify `main` and `origin/main` directly. The completion report for this packet records the observed SHA and readback result.
+- Commit and authoritative remote readback: root commit `657f8d9ad27602e237a173c475b0e24d31c217bb` (`Establish Auraline project architecture`) was pushed to `origin/main`; `git ls-remote origin refs/heads/main` returned the same SHA, and local/upstream divergence was `0 0`. This publication-evidence update follows that root commit because a commit cannot embed its own SHA in its hashed contents.
 - Preserved unrelated changes: none were found. The two untracked standards were intended M0 project files and were preserved byte-for-byte.
 
 ## Current Known-Good State
@@ -106,8 +106,8 @@ Establish the M0 repository and documentation skeleton for InfoPanel.Auraline. T
 ## Production State Versus Repository State
 
 - Implemented: documentation and repository structure only.
-- Committed: pending at handoff authoring; intended as the scoped M0 commit containing this file.
-- Pushed: pending at handoff authoring; the completion report records the observed result.
+- Committed: M0 root commit `657f8d9ad27602e237a173c475b0e24d31c217bb`, including the standards and initial handoff.
+- Pushed: `657f8d9ad27602e237a173c475b0e24d31c217bb` was read back from `origin/main`; this reconciled handoff version is published in the immediately following documentation commit.
 - Deployed or activated: nothing.
 - Runtime-validated: nothing; no runtime exists.
 - Documented or planned only: all Host, provider-client, rendering, render-session, shared-memory, UI, plugin, packaging, and beta behavior.
