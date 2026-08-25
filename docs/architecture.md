@@ -40,11 +40,32 @@ The initial implementation direction is:
 
 These are settled initial directions unless implementation evidence exposes a concrete incompatibility. M1 uses ASP.NET Core and Windows Forms from the .NET 8 shared frameworks plus Serilog's ASP.NET Core and rolling-file packages. SkiaSharp remains deferred until rendering begins. See [ADR-0001](decisions/0001-initial-implementation-stack.md).
 
+## Cross-platform and platform boundaries
+
+Auraline is Windows-first, with Linux as an intended future target. The current executable Host remains a `net8.0-windows` Windows Forms application; no Linux Host, tray integration, autostart implementation, packaging, or runtime support exists today.
+
+Reusable Auraline responsibilities must remain OS-agnostic .NET code wherever technically reasonable. This includes provider/protocol consumption, source and configuration models, validation, reconnect policy, web/API contracts, and future waveform processing, render-state logic, rendering abstractions, rendered-frame contracts, and metrics. `Auraline.Contracts` and the InfoPanel scaffold already target `net8.0`. The reusable code currently housed in `Auraline.Host` has no direct dependency on Windows APIs, although the Host project as a whole targets Windows because it contains the executable shell.
+
+Current platform ownership is explicit:
+
+| Responsibility | Current implementation | Future Linux responsibility |
+| --- | --- | --- |
+| Tray shell | Windows Forms `NotifyIcon` under `Platform/Windows` | Linux tray/status notifier, framework deferred |
+| Autostart | HKCU `Run` behind `IStartupRegistration` | XDG desktop or systemd-user mechanism, selected after runtime inspection |
+| Per-user paths | `%LOCALAPPDATA%\Auraline\` behind `IPlatformPaths` | XDG configuration/data/log paths |
+| Single instance | Local-namespaced semaphore and named pipe behind `ISingleInstanceCoordinator` | Equivalent per-user Linux coordination |
+| Browser launch | `IBrowserLauncher` with shell execution | Validate the existing implementation or replace only its platform adapter |
+| Provider, configuration, web, and contracts | OS-agnostic logic | Shared unchanged |
+
+New platform-specific behavior must be isolated behind a narrow boundary and document both its platform responsibility and the deferred Linux counterpart. A physical `Auraline.Host.Windows`/`Auraline.Host.Linux` or core project split is deferred until Linux implementation evidence requires it; the current bounded separation does not justify a large project restructure. See [ADR-0006](decisions/0006-windows-first-cross-platform-boundaries.md).
+
+M2 must preserve this boundary. The Resonance Signal waveform client and decoder, stream lifecycle, reconnect policy, waveform sample model, channel/mono processing, normalization, smoothing, idle/reconnecting/unavailable state, renderer abstraction, rendered-frame contract, and metrics remain OS-agnostic. SkiaSharp is treated as cross-platform unless package or runtime evidence establishes otherwise. The first Windows consumer is not a reason to introduce Windows APIs into waveform or rendering core logic.
+
 ## Process, configuration, and storage
 
 Auraline Host is a Windows-specific `WinExe` tray application, not a Windows service. A per-user named synchronization object admits one instance and a per-user named pipe lets a duplicate signal the primary instance to open the web UI. The first successful run opens the UI and persists completion; later starts remain tray-only. Current-user startup registration uses `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` and surfaces failure without terminating the Host.
 
-The Host web/API surface binds explicitly to `http://127.0.0.1:48481` by default and does not require authentication while it remains local-only. State-changing browser requests reject cross-site origins/fetch context so another website cannot silently submit the local forms. Provider endpoints in M1 configuration are likewise limited to numeric HTTP loopback addresses. Any future LAN exposure requires authentication before enablement and should also define appropriate transport security. See [ADR-0003](decisions/0003-host-process-and-api-boundary.md).
+The Host web/API surface binds explicitly to `http://127.0.0.1:48481` by default and does not require authentication while it remains local-only. State-changing browser requests reject cross-site origins/fetch context so another website cannot silently submit the local forms. Provider endpoints in M1 configuration are likewise limited to numeric HTTP loopback addresses. Any future LAN exposure requires authentication before enablement and should also define appropriate transport security. The Windows composition root supplies platform paths, autostart, single-instance coordination, tray, and browser services; reusable configuration/provider/web logic consumes platform-neutral values or interfaces. See [ADR-0003](decisions/0003-host-process-and-api-boundary.md).
 
 The long-term installer target is `C:\Program Files\Auraline\`. M1 stores schema-versioned JSON at `%LOCALAPPDATA%\Auraline\config\host.json` and bounded rolling logs under `%LOCALAPPDATA%\Auraline\logs\`. Configuration writes use a same-directory temporary file and atomic replacement. Malformed configuration is preserved, reported, and not overwritten by later settings actions. See [ADR-0004](decisions/0004-per-user-json-configuration.md).
 

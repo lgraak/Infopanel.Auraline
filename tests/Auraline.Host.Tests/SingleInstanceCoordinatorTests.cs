@@ -1,4 +1,4 @@
-using Auraline.Host.Lifecycle;
+using Auraline.Host.Platform.Windows;
 
 namespace Auraline.Host.Tests;
 

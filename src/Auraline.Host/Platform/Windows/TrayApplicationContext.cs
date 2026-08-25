@@ -1,8 +1,10 @@
 using System.Drawing;
+using Auraline.Host.Lifecycle;
 using Auraline.Host.Providers;
 
-namespace Auraline.Host.Lifecycle;
+namespace Auraline.Host.Platform.Windows;
 
+/// <summary>Windows Forms tray shell for the Windows Host executable.</summary>
 public sealed class TrayApplicationContext : ApplicationContext
 {
     private readonly NotifyIcon _trayIcon;

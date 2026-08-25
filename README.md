@@ -1,6 +1,6 @@
 # InfoPanel.Auraline
 
-InfoPanel.Auraline is a Windows visualization platform that will turn portable audio data from [Resonance Signal](https://github.com/lgraak/resonance-signal) into reusable rendered visuals. M1 now includes the executable Auraline Host foundation. Waveform rendering and the functional InfoPanel plugin begin in later milestones.
+InfoPanel.Auraline is a Windows-first visualization platform that will turn portable audio data from [Resonance Signal](https://github.com/lgraak/resonance-signal) into reusable rendered visuals. The current executable support is Windows only; Linux binaries and integrations are not implemented or supported. Reusable product logic is intentionally kept behind cross-platform boundaries so Linux support can be added later without replacing the Auraline core. M1 now includes the executable Auraline Host foundation. Waveform rendering and the functional InfoPanel plugin begin in later milestones.
 
 ## What works in M1
 
@@ -81,7 +81,7 @@ Auraline consumes provider-owned source metadata and treats source IDs and disco
 ## Repository layout
 
 ```text
-src/Auraline.Host/          Windows tray Host, loopback UI/API, persistence, and providers
+src/Auraline.Host/          Windows tray Host plus reusable loopback, persistence, and provider logic
 src/Auraline.Contracts/     Host/plugin contract-version foundation without UI dependencies
 src/InfoPanel.Auraline/     Build-only plugin boundary; no functional integration yet
 tests/Auraline.Host.Tests/  Durable Host/config/provider lifecycle tests
@@ -92,4 +92,4 @@ docs/                       Architecture, roadmap, decisions, handoffs, and stan
 
 M1 does not consume waveform frames, render a waveform, create render sessions, use shared-memory transport, mix sources, edit source groups/profiles, or integrate with InfoPanel at runtime. Channel count and sample rate remain blank in the Sources table because Resonance Signal v1 discovery does not expose them; those fields arrive with a waveform stream.
 
-M2 adds the first Host-owned waveform engine while preserving the provider, configuration, process, and loopback boundaries established here. See the [architecture](docs/architecture.md), [roadmap](docs/roadmap.md), and [decision records](docs/decisions/README.md).
+M2 adds the first Host-owned waveform engine while preserving the provider, configuration, process, loopback, and platform boundaries established here. Waveform protocol, processing, render-state, renderer contracts, and metrics must remain OS-agnostic wherever technically reasonable. See the [architecture](docs/architecture.md), [roadmap](docs/roadmap.md), and [decision records](docs/decisions/README.md).

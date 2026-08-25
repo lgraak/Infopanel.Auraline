@@ -92,3 +92,7 @@ These ideas are intentionally retained without expanding the initial proof:
 - update checking and later auto-update support;
 - richer installer integration; and
 - README screenshots or GIFs after the UI stabilizes.
+
+### Future Linux enablement
+
+Linux enablement remains outside the current M0-M6 Windows proof-of-concept milestones. Before claiming Linux support, add and validate a Linux Host shell, tray/status notifier, XDG configuration/data/log locations, Linux autostart integration, packaging, and cross-platform installation documentation. Compare the actual Windows and Linux InfoPanel plugin APIs before deciding whether the plugin remains one project or gains platform-specific adapters. Perform Linux runtime validation against Resonance Signal only after its Linux provider is available. No Linux tray framework, startup mechanism, package, or binary is selected by the current roadmap.

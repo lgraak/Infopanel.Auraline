@@ -1,10 +1,12 @@
 using System.IO.Pipes;
 using System.Security.Cryptography;
 using System.Text;
+using Auraline.Host.Lifecycle;
 
-namespace Auraline.Host.Lifecycle;
+namespace Auraline.Host.Platform.Windows;
 
-public sealed class SingleInstanceCoordinator : IAsyncDisposable
+/// <summary>Windows-only implementation using a Local-namespaced semaphore and named pipe.</summary>
+public sealed class SingleInstanceCoordinator : ISingleInstanceCoordinator
 {
     private readonly string _pipeName;
     private readonly Semaphore _semaphore;

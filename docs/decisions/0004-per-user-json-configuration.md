@@ -18,3 +18,5 @@ Configuration is supportable and easy to inspect without a database dependency. 
 ## M1 implementation evidence
 
 Schema version 1 lives at `%LOCALAPPDATA%\Auraline\config\host.json`; rolling logs live beside it under `logs\`. Writes serialize to a same-directory temporary file and replace the destination atomically. Missing configuration bootstraps one stable local provider. Malformed or invalid configuration is preserved unchanged, reported through Host health/UI, and made read-only until repaired rather than silently reset.
+
+The `%LOCALAPPDATA%` mapping is a Windows platform responsibility supplied through `IPlatformPaths`. Configuration consumers operate on the resolved `AuralinePaths` value and do not embed a universal Windows path assumption. A future Linux implementation will supply appropriate XDG paths without changing the schema or store.

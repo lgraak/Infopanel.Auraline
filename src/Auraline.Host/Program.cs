@@ -1,5 +1,7 @@
 using Auraline.Host.Configuration;
 using Auraline.Host.Lifecycle;
+using Auraline.Host.Platform;
+using Auraline.Host.Platform.Windows;
 using Auraline.Host.Providers;
 using Auraline.Host.Web;
 using Serilog;
@@ -12,7 +14,7 @@ public static class Program
     [STAThread]
     public static int Main(string[] args)
     {
-        var instance = new SingleInstanceCoordinator("Auraline.Host");
+        ISingleInstanceCoordinator instance = new SingleInstanceCoordinator("Auraline.Host");
         if (!instance.IsPrimary)
         {
             instance.SignalOpenAsync(TimeSpan.FromSeconds(3)).GetAwaiter().GetResult();
@@ -20,7 +22,8 @@ public static class Program
             return 0;
         }
 
-        var paths = AuralinePaths.ForCurrentUser();
+        IPlatformPaths platformPaths = new WindowsPlatformPaths();
+        var paths = platformPaths.GetPaths();
         paths.EnsureDirectories();
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
