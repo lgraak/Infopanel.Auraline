@@ -77,6 +77,7 @@ When audio is active, InfoPanel displays Host-rendered motion. When playback sto
 
 - The InfoPanel consumer-demand prerequisite is local and not yet present in the installed public preview build.
 - Packaging is manual; the combined Auraline installer is deferred.
+- InfoPanel-side mapping measurements reached about 27–28.5 FPS for two simultaneous 30 FPS outputs and about 48–51.5 FPS for two simultaneous 60 FPS outputs while Host sessions ran about 29.8 and 57.6 FPS respectively. The 60 FPS option is a supported bounded sanity mode, not a claim of full 60 FPS display cadence in the current InfoPanel scheduler.
 - M5 profile/source-group editing, stereo, advanced visual styling, LAN transport, Linux transport, and Linux InfoPanel integration are not implemented.
 - The plugin offers two independent output slots; multiple display items bound to one slot share that slot's largest active dimension because InfoPanel exposes one producer buffer per image ID.
 

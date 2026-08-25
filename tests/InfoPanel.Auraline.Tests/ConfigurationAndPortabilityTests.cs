@@ -11,7 +11,7 @@ public sealed class ConfigurationAndPortabilityTests
     {
         var plugin = new AuralinePlugin();
 
-        Assert.Equal(TimeSpan.FromMilliseconds(1000d / 30), plugin.UpdateInterval);
+        Assert.Equal(TimeSpan.FromMilliseconds(1000d / (30 * 2d)), plugin.UpdateInterval);
         Assert.Equal([AuralinePlugin.PrimaryImageId, AuralinePlugin.SecondaryImageId],
             plugin.ImageDescriptors.Select(descriptor => descriptor.Id).ToArray());
         Assert.Equal(AuralinePlugin.DefaultEndpoint,
@@ -21,7 +21,7 @@ public sealed class ConfigurationAndPortabilityTests
 
         plugin.Initialize();
         plugin.ApplyConfig("TargetFps", "60");
-        Assert.Equal(TimeSpan.FromMilliseconds(1000d / 60), plugin.UpdateInterval);
+        Assert.Equal(TimeSpan.FromMilliseconds(1000d / (60 * 2d)), plugin.UpdateInterval);
         plugin.Close();
     }
 

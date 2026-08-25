@@ -37,7 +37,10 @@ public sealed class AuralinePlugin : BasePlugin, IPluginConfigurable, IPluginIma
     {
     }
 
-    public override TimeSpan UpdateInterval => TimeSpan.FromMilliseconds(1000d / _targetFps);
+    // InfoPanel waits this interval after UpdateAsync completes. Wake at a bounded
+    // 2x producer cadence so the latest-only reader does not systematically miss
+    // Host frames; duplicate sequences are rejected before image publication.
+    public override TimeSpan UpdateInterval => TimeSpan.FromMilliseconds(1000d / (_targetFps * 2d));
 
     public IReadOnlyList<PluginImageDescriptor> ImageDescriptors { get; } =
     [
