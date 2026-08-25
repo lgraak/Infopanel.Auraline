@@ -1,12 +1,12 @@
 # Auraline M1 Handoff
 
-Date: 2026-08-24 23:56:07 -07:00
-Status: Completed with bounded runtime-observation limitations; publication pending
+Date: 2026-08-25 00:01:44 -07:00
+Status: Completed and published with bounded runtime-observation limitations
 Model: GPT-5.6 Sol
 Effort: High
 Repository: InfoPanel.Auraline at `D:\Aeons\Git\Infopanel.Auraline`
 Branch: `main`
-HEAD: `2a70d56e5d1d6f3167ebc0e5658b9d4685b445b2` before the M1 commit
+HEAD: `8f89bf2d02b09363c595bfcbfb3f951f75ba382b` when M1 publication evidence was captured
 Authoritative remote: `origin` at `https://github.com/lgraak/Infopanel.Auraline.git`
 
 > This handoff is a continuation checkpoint, not authoritative truth. Current
@@ -36,10 +36,10 @@ Create the first executable .NET 8 Auraline Host foundation: a per-user Windows 
 
 ## Current Repository State
 
-- Branch and HEAD: `main` at pre-M1 `2a70d56e5d1d6f3167ebc0e5658b9d4685b445b2`; the final M1 commit and publication evidence will be reconciled in this handoff after commit/push.
-- Working tree: contains only the intended M1 solution, code, tests, documentation, and this handoff.
-- Upstream and synchronization: preflight fetch passed; local `main`, `origin/main`, and the Observer revision were identical with divergence `0 0`.
-- Commit and authoritative remote readback: pending at this checkpoint.
+- Branch and HEAD: `main` at M1 implementation commit `8f89bf2d02b09363c595bfcbfb3f951f75ba382b` when publication evidence was captured.
+- Working tree: clean after the M1 implementation commit; this publication-evidence reconciliation is the only follow-up change.
+- Upstream and synchronization: preflight local/remote state matched `2a70d56e5d1d6f3167ebc0e5658b9d4685b445b2`; post-push fetch showed local `HEAD == origin/main == 8f89bf2d02b09363c595bfcbfb3f951f75ba382b` with divergence `0 0`.
+- Commit and authoritative remote readback: `8f89bf2 Build Auraline Host core` was pushed to `origin/main`; `git ls-remote origin refs/heads/main` returned the same full SHA.
 - Preserved unrelated changes: none existed at preflight and none were introduced.
 
 ## Current Known-Good State
@@ -114,12 +114,13 @@ Create the first executable .NET 8 Auraline Host foundation: a per-user Windows 
 - Tray automation: the STA test created the real `NotifyIcon`, verified `Open Auraline`, `Reconnect Providers`, and `Exit`, exercised Open, and exercised Exit/resource disposal. Live visual tray-menu clicking was not run because the Windows automation helper could not safely target the shell hidden-icon overflow.
 - Provider-unavailable behavior: deterministic automated validation passed for Reconnecting state, concise reason, initial 500 ms backoff, and shutdown cancellation. A live unavailable-provider run was not performed because the provider was available and stopping/modifying Resonance Signal was outside scope.
 - Final scope/diff review: completed; no waveform rendering/consumption, mixing, shared memory, functional plugin, external binding, database, installer, service, updater, Resonance Signal change, or upstream InfoPanel change was introduced.
+- Publication: `git push origin main` advanced the authoritative branch from `2a70d56` to `8f89bf2`; fetch, local/upstream comparison, divergence, and `git ls-remote` readback all matched the full M1 SHA.
 
 ## Production State Versus Repository State
 
 - Implemented: complete M1 repository behavior described above.
-- Committed: pending at handoff creation.
-- Pushed: pending at handoff creation.
+- Committed: `8f89bf2d02b09363c595bfcbfb3f951f75ba382b` (`Build Auraline Host core`), including implementation, tests, documentation, and the initial handoff.
+- Pushed: the same full SHA was verified on authoritative `origin/main`; this handoff reconciliation follows as publication evidence because a Git commit cannot contain its own SHA.
 - Deployed or activated: no installed application or production deployment. Runtime validation created per-user Auraline config/log state and the observed enabled current-user Run entry pointing to the Release build output.
 - Runtime-validated: Host process, no-main-window behavior, first-run browser/UI, duplicate signaling, loopback health/UI, live provider discovery, manual provider controls, persistence/log paths, and startup enable/disable.
 - Documented or planned only: waveform engine, render sessions, frame transport, editable source groups/profiles, functional InfoPanel integration, LAN security, packaging, and M6 diagnostics.
@@ -138,7 +139,7 @@ Create the first executable .NET 8 Auraline Host foundation: a per-user Windows 
 - No administrator privilege, service, scheduled task, firewall change, credential, secret, audio capture, audio sample persistence, or non-loopback exposure was introduced.
 - Repository rollback is ordinary Git reversal after publication. Per-user config/logs and the HKCU Run value are external state and are not removed by a Git revert.
 - No Resonance Signal or upstream InfoPanel files/process settings were modified. The live provider was read through its public loopback protocol only.
-- Shared `origin/main` publication still requires the explicit commit/push steps and remote readback; no force-push, reset, cleanup, branch change, or history rewrite is authorized.
+- The authorized shared `origin/main` publication and readback are complete. No force-push, reset, cleanup, branch change, or history rewrite occurred.
 
 ## Do Not Redo or Reopen
 
