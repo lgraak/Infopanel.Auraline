@@ -1,12 +1,12 @@
 # Auraline M2 Live Acceptance Handoff
 
-Date: 2026-08-25 09:49:35 -07:00
-Status: completed locally; publication evidence pending
+Date: 2026-08-25 09:52:49 -07:00
+Status: completed and published; publication-evidence reconciliation follows
 Model: GPT-5 Codex
 Effort: high
 Repository: InfoPanel.Auraline at `D:\Aeons\Git\Infopanel.Auraline`
 Branch: `main`
-HEAD: `246187c66389dcfe7d5bea77a5a25a87bea853cc` before the M2 implementation commit
+HEAD: `3117256a58c82db82723f7ae4e6ac11b2b8e31da` when M2 implementation publication evidence was captured
 Authoritative remote: `origin` at `https://github.com/lgraak/Infopanel.Auraline.git`
 
 > This handoff is a continuation checkpoint, not authoritative truth. Current
@@ -15,7 +15,7 @@ Authoritative remote: `origin` at `https://github.com/lgraak/Infopanel.Auraline.
 
 ## Objective
 
-Complete M2 by exercising the existing Host-owned waveform engine against live Resonance Signal Default Playback, correcting only defects exposed by that acceptance, measuring real renderer timing, preserving ADR-0006 portability boundaries, reconciling documentation, and publishing the bounded milestone without beginning M3. Implementation and local acceptance are complete; publication is the remaining gate at this checkpoint.
+Complete M2 by exercising the existing Host-owned waveform engine against live Resonance Signal Default Playback, correcting only defects exposed by that acceptance, measuring real renderer timing, preserving ADR-0006 portability boundaries, reconciling documentation, and publishing the bounded milestone without beginning M3. The objective was achieved.
 
 ## Authoritative Sources
 
@@ -39,7 +39,8 @@ Complete M2 by exercising the existing Host-owned waveform engine against live R
 - Preflight authoritative readback: local `HEAD == origin/main == 246187c66389dcfe7d5bea77a5a25a87bea853cc`.
 - Working-tree classification: every listed modification/untracked file belongs to the bounded M2 implementation, tests, documentation, or handoff. No unrelated user changes were identified; none were reset, stashed, cleaned, overwritten, or discarded.
 - Resonance Signal: `main` at `1da75ecb771eebfec597aaa8d4c64f8863b46381`; source repository was read-only and unchanged.
-- Commit/push/readback: pending at this checkpoint and must be reconciled after publication because a Git commit cannot contain its own SHA.
+- Commit and push: `3117256a58c82db82723f7ae4e6ac11b2b8e31da` (`Build Auraline waveform engine`) contains the implementation, tests, documentation, provisional checkpoint, and initial live-acceptance checkpoint. `git push origin main` advanced authoritative `origin/main` from `246187c66389dcfe7d5bea77a5a25a87bea853cc` to `3117256a58c82db82723f7ae4e6ac11b2b8e31da`.
+- Authoritative readback: a fresh fetch showed local `HEAD == origin/main == 3117256a58c82db82723f7ae4e6ac11b2b8e31da` with divergence `0 0`; `git ls-remote origin refs/heads/main` returned the same full SHA. This handoff reconciliation follows because a Git commit cannot contain its own SHA.
 
 ## Current Known-Good State
 
@@ -92,12 +93,13 @@ Complete M2 by exercising the existing Host-owned waveform engine against live R
 - Explicit ADR-0006 Windows-token scan in `src/Auraline.Host/Waveform`: no matches. The test suite also enforces this boundary.
 - Raw sample/pixel persistence scan: no logging/serialization/file-write matches. M3/shared-memory code scan over `.cs`/`.csproj`: no matches.
 - Default-device replacement/reconnect: not performed because only one available Default Playback source existed and no safe physical replacement or reliable user-level swap path was available. Reconnect, terminal reset, `retry_now`, `wait_for_source`, capped backoff, `DoNotRetry`, and Unavailable behavior remain covered by deterministic tests.
+- Publication: implementation commit `3117256a58c82db82723f7ae4e6ac11b2b8e31da` was pushed and independently read back from authoritative `origin/main` with divergence `0 0`.
 
 ## Production State Versus Repository State
 
 - Implemented: complete M2 waveform engine, live diagnostics preview, tests, and documentation exist in the working tree.
-- Committed: pending at this checkpoint.
-- Pushed: pending at this checkpoint.
+- Committed: implementation commit `3117256a58c82db82723f7ae4e6ac11b2b8e31da` (`Build Auraline waveform engine`); this publication-evidence reconciliation is the only follow-up change.
+- Pushed: the same implementation SHA was verified on authoritative `origin/main`; this evidence-only follow-up will be published separately.
 - Deployed or activated: no installed release or production deployment; only repository Debug Host processes were run and stopped.
 - Runtime-validated: live Default Playback connection, metadata, binary/render counters, Active/Idle visuals, loopback binding, PNG preview, timing, and bounded resource behavior.
 - Deterministically validated only: reconnect/device-boundary policy and Unavailable state.
@@ -109,7 +111,7 @@ Complete M2 by exercising the existing Host-owned waveform engine against live R
 - Unavailable was not manufactured by stopping/reconfiguring Resonance Signal, as prohibited.
 - Three SkiaSharp text API calls used only for reconnect/unavailable overlays are obsolete but functional; replacing them was not justified by M2 live acceptance.
 - Renderer timing is a local sanity check, not a statistically controlled benchmark across devices or operating systems.
-- Publication evidence remains pending until the scoped commit, push, fetch/readback, divergence check, and remote SHA check complete.
+- The evidence-only follow-up commit cannot record its own SHA inside this file; its exact SHA and final remote readback belong in the final execution report.
 
 ## Safety, Rollback, and Access Considerations
 
@@ -127,4 +129,4 @@ Complete M2 by exercising the existing Host-owned waveform engine against live R
 
 ## Next Recommended Action
 
-Commit and publish the scoped M2 implementation and handoffs to authoritative `origin/main`, then reconcile this checkpoint with exact commit/push/readback evidence.
+Begin the bounded M3 render-session and local shared-memory transport milestone from this published checkpoint.
