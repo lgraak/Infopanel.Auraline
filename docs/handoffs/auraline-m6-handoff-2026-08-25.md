@@ -1,12 +1,12 @@
 # Auraline M6 Diagnostics and Beta Readiness Handoff
 
-Date: 2026-08-25T16:21:45-07:00
-Status: completed locally; exact packaged plugin activation and runtime acceptance passed, with authoritative publication pending this evidence commit
+Date: 2026-08-25T16:23:52.3334917-07:00
+Status: completed and published; this evidence-only reconciliation follows the published M6 acceptance checkpoint
 Model: GPT-5 Codex
 Effort: High
 Repository: InfoPanel.Auraline
 Branch: `main`
-HEAD: `5016c40be648a8252ad1327381101f2527d53613` (local activation-blocker checkpoint; this final acceptance reconciliation follows it)
+HEAD: `4c4c944d15000574fc2ecbc450c11bdccaac1420` (published M6 acceptance checkpoint; this reconciliation follows it)
 Authoritative remote: `origin` at `https://github.com/lgraak/Infopanel.Auraline.git`
 
 > This handoff is a continuation checkpoint, not authoritative truth. Current
@@ -67,9 +67,11 @@ change was included.
 - Local activation-blocker evidence commit:
   `5016c40be648a8252ad1327381101f2527d53613`
   (`Record Auraline M6 activation blocker`).
-- Fresh remote readback: `origin/main` remains
-  `12149917b842139f0d0014b887079493da151ac6`; local divergence before this
-  reconciliation is zero behind and three commits ahead.
+- Publication commit and readback: normal fast-forward push advanced `origin/main`
+  from `12149917b842139f0d0014b887079493da151ac6` through M6 acceptance commit
+  `4c4c944d15000574fc2ecbc450c11bdccaac1420`. Fresh fetch, tracking reference,
+  local `HEAD`, and `ls-remote refs/heads/main` all matched `4c4c944`; divergence
+  was `0 0` before this evidence-only reconciliation.
 - The implementation commit contains 28 intended files, 812 insertions, and 26
   deletions. The acceptance-evidence commit adds only this handoff.
 - No reset, stash, clean, force push, merge, rebase, branch, or history rewrite
@@ -232,6 +234,10 @@ change was included.
 - Final publication preflight: fresh `origin/main` remained `1214991`, divergence
   `0 3`, remote ancestry was fast-forward-safe, working tree was otherwise clean,
   and `git diff --check` passed.
+- Publication/readback: after the final acceptance evidence commit, normal
+  fast-forward push advanced authoritative `origin/main` to
+  `4c4c944d15000574fc2ecbc450c11bdccaac1420`. Fresh fetch and independent
+  `ls-remote` matched local `HEAD` and `origin/main`; divergence was `0 0`.
 - Not run: another physical clean Windows machine; public InfoPanel build; Linux;
   LAN/network consumers; source mixing; or installer/updater. Supported plugin
   unload/reload was not separately repeated because InfoPanel's tray UI was not
@@ -243,9 +249,11 @@ change was included.
 - Committed: local implementation commit
   `b242ee3022c0c87d665bfd28a7420502cea99215` and acceptance-evidence commit
   `e02e88451dbda09ae9ba8eddff309768e94f99dd`, plus blocker-evidence commit
-  `5016c40be648a8252ad1327381101f2527d53613`; this reconciliation follows them.
-- Pushed: not pushed. The authoritative remote remains the M5 publication record
-  `12149917b842139f0d0014b887079493da151ac6` after fresh fetch.
+  `5016c40be648a8252ad1327381101f2527d53613` and final acceptance commit
+  `4c4c944d15000574fc2ecbc450c11bdccaac1420`; this reconciliation follows them.
+- Pushed: M6 is published through
+  `4c4c944d15000574fc2ecbc450c11bdccaac1420` with authoritative divergence
+  `0 0` before this evidence-only reconciliation.
 - Deployed or activated: the exact final packaged M6 Host and four-file M6 plugin
   are active locally as `0.1.0-beta.1`.
 - Runtime-validated: exact M6 Host/plugin, provider/source/waveform, isolated
@@ -263,7 +271,9 @@ change was included.
 - The compatible InfoPanel consumer-dimension prerequisite remains unpublished
   upstream. External beta distribution therefore remains gated on providing
   testers a compatible InfoPanel build.
-- Publication is pending this final evidence commit and authoritative readback.
+- This publication reconciliation is a separate evidence-only commit and requires
+  one final normal push/readback; the accepted M6 implementation itself is already
+  authoritative at `4c4c944`.
 - The three established Skia obsolete-text warnings remain outside M6 scope.
 
 ## Safety, Rollback, and Access Considerations
