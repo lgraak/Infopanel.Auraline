@@ -15,6 +15,16 @@ public static class RenderSessionApi
 {
     public static void MapRenderSessionEndpoints(this WebApplication app)
     {
+        app.MapGet("/api/v1/profiles", () => Results.Json(new AuralineProfileCatalog(
+            ContractVersion.Current,
+            Web.HostStatusService.Version,
+            [new AuralineProfileSummary(
+                AuralineProfiles.DefaultProfileId,
+                "Default Waveform",
+                true,
+                "waveform",
+                "available")])));
+
         app.MapPost("/api/v1/render-sessions/attach", (AttachRenderSessionRequest request, RenderSessionManager sessions) =>
         {
             try

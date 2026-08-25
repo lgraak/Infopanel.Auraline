@@ -1,13 +1,62 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PlatformTarget>x64</PlatformTarget>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0-m4</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Auraline.Contracts\Auraline.Contracts.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="InfoPanel.Plugins">
+      <HintPath>references\InfoPanel.Plugins.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="InfoPanel.Plugins.Graphics">
+      <HintPath>references\InfoPanel.Plugins.Graphics.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="SkiaSharp">
+      <HintPath>references\SkiaSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="InfoPanel.Auraline.Tests" />
+    <None Update="PluginInfo.ini">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <Target Name="ValidateInfoPanelReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('references\InfoPanel.Plugins.dll') Or !Exists('references\InfoPanel.Plugins.Graphics.dll') Or !Exists('references\SkiaSharp.dll') Or !Exists('references\libSkiaSharp.dll')"
+           Text="Populate src/InfoPanel.Auraline/references with the matching InfoPanel 1.4.x plugin contract assemblies; see references/README.md." />
+  </Target>
+
+  <Target Name="CreatePluginPackage" AfterTargets="Build">
+    <PropertyGroup>
+      <PluginPackageDir>$(MSBuildProjectDirectory)\artifacts\InfoPanel.Auraline</PluginPackageDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <PluginPackageFiles Include="$(TargetDir)InfoPanel.Auraline.dll" />
+      <PluginPackageFiles Include="$(TargetDir)Auraline.Contracts.dll" />
+      <PluginPackageFiles Include="$(TargetDir)InfoPanel.Auraline.deps.json" Condition="Exists('$(TargetDir)InfoPanel.Auraline.deps.json')" />
+      <PluginPackageFiles Include="$(TargetDir)PluginInfo.ini" />
+    </ItemGroup>
+    <RemoveDir Directories="$(PluginPackageDir)" />
+    <MakeDir Directories="$(PluginPackageDir)" />
+    <Copy SourceFiles="@(PluginPackageFiles)" DestinationFolder="$(PluginPackageDir)" SkipUnchangedFiles="false" />
+  </Target>
 
 </Project>

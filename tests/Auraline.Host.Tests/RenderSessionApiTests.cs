@@ -16,6 +16,23 @@ namespace Auraline.Host.Tests;
 public sealed class RenderSessionApiTests
 {
     [Fact]
+    public async Task ProfileCatalogExposesStableDefaultProfileAndContract()
+    {
+        await using var fixture = await ApiFixture.StartAsync(cap: 2);
+
+        var catalog = await fixture.Client.GetFromJsonAsync<AuralineProfileCatalog>("/api/v1/profiles");
+
+        Assert.NotNull(catalog);
+        Assert.Equal(ContractVersion.Current, catalog.ContractVersion);
+        Assert.Equal("1.0.0-m4", catalog.HostVersion);
+        var profile = Assert.Single(catalog.Profiles);
+        Assert.Equal(AuralineProfiles.DefaultProfileId, profile.ProfileId);
+        Assert.Equal("Default Waveform", profile.FriendlyName);
+        Assert.True(profile.IsDefault);
+        Assert.Equal("waveform", profile.VisualizationType);
+    }
+
+    [Fact]
     public async Task AttachHeartbeatDiagnosticsAndDetachUseVersionedLoopbackApi()
     {
         await using var fixture = await ApiFixture.StartAsync(cap: 2);

@@ -3,6 +3,8 @@
 [Oo]bj/
 [Aa]rtifacts/
 [Pp]ublish/
+src/InfoPanel.Auraline/references/*.dll
+src/InfoPanel.Auraline/references/*.pdb
 *.binlog
 
 # Visual Studio and MSBuild user state

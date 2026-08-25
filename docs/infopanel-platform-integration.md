@@ -1,7 +1,25 @@
-# InfoPanel Platform Integration Audit (Pre-M3)
+# InfoPanel Platform Integration Audit and M4 Addendum
 
 Date: 2026-08-25
-Status: completed
+Status: pre-M3 audit completed; M4 Windows authority reconciled and directly accepted
+
+## M4 Windows authority addendum
+
+M4 reverified the installed application and current Windows source before implementation. The applicable Windows authority is now the local `habibrehmansg/infopanel` `1.4.x` checkout at implementation checkpoint `d7021153e31809abba3f4399adacec9c34e4c610` (current handoff-only HEAD `8ef8692cbd0de54db3377380b6722df1da3eae1a`). It adds the backwards-compatible optional `IPluginImageConsumerAware` contract and per-consumer final pixel demands. That prerequisite is committed locally but is not present on `origin/1.4.x` or in installed InfoPanel `1.4.0-preview.2.43`. The older Windows findings below remain historical pre-M3 evidence rather than the current implementation contract.
+
+The current 1.4.x plugin path now provides:
+
+- isolated plugin-host processes with automatic sidecar configuration;
+- `IPluginImageProvider`, host-owned `IPluginImageWriter`, and `plugin-image://{pluginId}/{imageId}` bindings;
+- double-buffered Skia image mappings and producer-owned resize notifications;
+- replacement consumer-demand snapshots containing image ID, independent consumer ID, and final scaled width/height; and
+- replay across plugin-host restart while legacy plugins retain the existing scaling fallback.
+
+M4 therefore uses the existing writer contract directly. `InfoPanel.Auraline/Core` owns portable Host/profile/session/lease state, `Platform/Windows` reads Auraline shared memory, and `Adapters` copies validated RGBA8888-premultiplied pixels into InfoPanel's inactive writer bitmap before invalidation. No upstream InfoPanel source was modified by M4.
+
+One InfoPanel image ID has one producer buffer. For exact simultaneous different-size proof, Auraline exposes `waveform` and `waveform-2`. Multiple consumers of one output select its largest current demand and use InfoPanel's existing scaling fallback; the two output IDs can hold distinct Host sessions and dimensions concurrently.
+
+Direct M4 acceptance on 2026-08-25 used that exact local prerequisite build. InfoPanel loaded both outputs, supplied `600x150` and `300x300` demands, displayed Active and Idle Host-rendered frames with the expected transparency and color, consumed about 30 FPS and about 59 FPS, released both leases on plugin unload, restored them on reload, showed the explicit unavailable surface during a controlled Host outage, and recovered both new sessions without restarting InfoPanel. The dated M4 handoff separates this local runtime proof from public-build availability.
 
 ## 1) Scope and authority
 

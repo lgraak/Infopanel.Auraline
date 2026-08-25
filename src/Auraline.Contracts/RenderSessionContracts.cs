@@ -7,6 +7,18 @@ public static class AuralineProfiles
     public const string DefaultProfileId = "default-profile";
 }
 
+public sealed record AuralineProfileSummary(
+    [property: JsonPropertyName("profile_id")] string ProfileId,
+    [property: JsonPropertyName("friendly_name")] string FriendlyName,
+    [property: JsonPropertyName("is_default")] bool IsDefault,
+    [property: JsonPropertyName("visualization_type")] string VisualizationType,
+    [property: JsonPropertyName("status")] string Status);
+
+public sealed record AuralineProfileCatalog(
+    [property: JsonPropertyName("contract_version")] ContractVersion ContractVersion,
+    [property: JsonPropertyName("host_version")] string HostVersion,
+    [property: JsonPropertyName("profiles")] IReadOnlyList<AuralineProfileSummary> Profiles);
+
 public readonly record struct RenderSessionKey(
     [property: JsonPropertyName("profile_id")] string ProfileId,
     [property: JsonPropertyName("width")] int Width,

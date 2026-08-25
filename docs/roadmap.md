@@ -8,7 +8,7 @@ This roadmap describes intent, not shipped functionality. M4 is the first true e
 - [x] M1: Auraline Host core
 - [x] M2: Waveform engine
 - [x] M3: Render-session and IPC layer
-- [ ] M4: InfoPanel.Auraline end-to-end integration
+- [x] M4: InfoPanel.Auraline end-to-end integration
 - [ ] M5: Host configuration UI
 - [ ] M6: Diagnostics and beta readiness
 
@@ -36,6 +36,8 @@ M3 now includes the stable temporary `default-profile`, profile/dimension/FPS-co
 ### M4: InfoPanel.Auraline end-to-end integration
 
 Build the thin InfoPanel adapter, bind it by stable profile ID, negotiate a render session, transfer frames, and display the waveform in InfoPanel. This is the first true end-to-end proof and the point at which hands-on product validation begins.
+
+The M4 repository implementation includes the Windows plugin, profile catalog, exact consumer-demand sizing, shared-memory reader, reconnect/lease lifecycle, InfoPanel image adapter, manual package, diagnostics, and focused tests. Direct acceptance passed in the matching local Windows InfoPanel prerequisite runtime for Active and Idle display, transparency and color, resize cleanup, two differently sized consumers, 30/60 FPS, plugin unload/reload, explicit unavailable state, and automatic Host-restart recovery. The prerequisite remains local and is not present in the older installed public preview.
 
 ### M5: Host configuration UI
 

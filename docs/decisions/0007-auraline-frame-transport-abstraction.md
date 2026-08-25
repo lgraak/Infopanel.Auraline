@@ -34,3 +34,9 @@ Auraline defines transport as an explicit abstraction independent of plugin cont
 ## M3 implementation note
 
 `Auraline.Contracts` now defines OS-neutral session descriptors, consumer leases, frame publication/read results, and publisher/reader/factory interfaces. The concrete `MemoryMappedFile` implementation and its opaque resource naming live under `Auraline.Host/Platform/Windows`; neither Windows nor InfoPanel types appear in the shared contracts or render-session domain. The descriptor exposes only transport kind/version, opaque resource name, allocation/header/slot geometry, and pixel format needed by a compatible local adapter.
+
+## M4 implementation note
+
+`InfoPanel.Auraline/Core` implements profile/session/lease/reconnect orchestration without Windows memory mapping or InfoPanel types. `Platform/Windows` supplies the read-only layout-v1 consumer, and `Adapters` supplies the InfoPanel writer bridge. Source-level tests enforce those boundaries. The existing M3 transport layout and Host renderer semantics are unchanged.
+
+Direct Windows acceptance confirmed the boundary at two simultaneous dimensions, 30/60 FPS, plugin reload, and Host restart. InfoPanel consumed Host-rendered pixels through the adapter; no waveform renderer or sample path was added to the plugin.

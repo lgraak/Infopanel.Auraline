@@ -2,13 +2,13 @@
 
 ## Status and scope
 
-This document records the architecture for InfoPanel.Auraline. M1 implemented the Windows tray Host and provider foundation, M2 added the Host-owned waveform engine, and M3 adds render sessions plus Windows local frame transport. Functional InfoPanel integration remains M4.
+This document records the architecture for InfoPanel.Auraline. M1 implemented the Windows tray Host and provider foundation, M2 added the Host-owned waveform engine, M3 added render sessions plus Windows local frame transport, and M4 implements the thin Windows InfoPanel consumer. M4 direct runtime acceptance passed against the matching local Windows prerequisite; repository implementation, local activation, and public InfoPanel availability remain separate states.
 
 ## Product and component boundaries
 
 Resonance Signal is the audio-data provider and owns audio capture, Windows audio-device discovery, provider-side source identity, and provider protocol behavior. Auraline is a client of Resonance Signal. It must not duplicate provider responsibilities.
 
-Auraline Host is independent of InfoPanel and launches independently with Windows. It owns provider connections, the domain model, waveform processing/rendering, configuration, diagnostics, and control surfaces. InfoPanel.Auraline remains a planned thin layer that will bind to a stable profile ID, negotiate a render session, and display produced frames. It does not process waveform samples or contain product/rendering logic.
+Auraline Host is independent of InfoPanel and launches independently with Windows. It owns provider connections, the domain model, waveform processing/rendering, configuration, diagnostics, and control surfaces. InfoPanel.Auraline is a thin layer that binds to a stable profile ID, negotiates render sessions from InfoPanel's exact consumer dimensions, reads complete Host-rendered frames, and publishes them through the current InfoPanel writer contract. It does not process waveform samples or contain product/rendering logic.
 
 ```text
 Resonance Signal
@@ -57,10 +57,11 @@ Current platform ownership is explicit:
 | Frame transport | One opaque named shared-memory region per render session behind `IAuralineFrameTransport` | Local Linux transport adapter, mechanism deferred |
 | Browser launch | `IBrowserLauncher` with shell execution | Validate the existing implementation or replace only its platform adapter |
 | Provider, configuration, web, and contracts | OS-agnostic logic | Shared unchanged |
+| InfoPanel consumer | Shared orchestration plus Windows shared-memory and InfoPanel adapters | Future Linux adapters; mechanism deferred |
 
 New platform-specific behavior must be isolated behind a narrow boundary and document both its platform responsibility and the deferred Linux counterpart. A physical `Auraline.Host.Windows`/`Auraline.Host.Linux` or core project split is deferred until Linux implementation evidence requires it; the current bounded separation does not justify a large project restructure. See [ADR-0006](decisions/0006-windows-first-cross-platform-boundaries.md).
 
-The Resonance Signal waveform client and decoder, stream lifecycle, reconnect policy, waveform sample model, channel/mono processing, normalization, smoothing, idle/reconnecting/unavailable state, renderer, render-session domain, transport contracts, and metrics remain OS-agnostic. SkiaSharp is treated as cross-platform unless package or runtime evidence establishes otherwise. Windows memory-mapped-file APIs exist only under `Platform/Windows`.
+The Resonance Signal waveform client and decoder, stream lifecycle, reconnect policy, waveform sample model, channel/mono processing, normalization, smoothing, idle/reconnecting/unavailable state, renderer, render-session domain, transport contracts, and metrics remain OS-agnostic. The plugin's Host client, profile/session orchestration, lease lifecycle, reconnect policy, and consumer state machine are likewise implementation-neutral source under `InfoPanel.Auraline/Core`. SkiaSharp is treated as cross-platform unless package or runtime evidence establishes otherwise. Windows memory-mapped-file APIs exist only under `Platform/Windows`, while InfoPanel types remain in the plugin entry point and `Adapters`.
 
 ## Process, configuration, and storage
 
@@ -158,6 +159,10 @@ The default frame rate is 30 FPS. The architecture should permit 60 FPS without 
 The M3 scheduler renders the latest waveform state at the session cadence. Missed deadlines are skipped and reset from current time rather than accumulated. Each session sequence is monotonic; consumers read the latest complete frame and never queue historical pixels.
 
 Windows layout version 1 contains a 128-byte header followed by two fixed-capacity slots. The header records `AURL` magic, major/minor layout version, geometry, stride, RGBA8888-premultiplied format, payload/slot bounds, target FPS, sequence, UTC ticks, active slot, and an aligned publication version. The writer marks the version odd, fills the inactive slot, publishes metadata/slot, then makes the version even. A reader copies only between identical even version reads; a concurrent write causes retry. Pixel bytes are R, G, B, A in memory with Skia premultiplied alpha. The Host owns the mapping and writer; consumers are read-only. Raw waveform/audio samples never enter transport memory.
+
+M4 adds consumer-side orchestration without changing that layout. InfoPanel reports replacement demand snapshots keyed by image output and independent consumer. One plugin output selects its largest demand because InfoPanel owns one producer buffer per image ID; the plugin exposes a second output so two different exact dimensions can be active simultaneously. A new dimension request attaches a new immutable Host session, waits for its first valid frame, resizes/publishes the InfoPanel buffer, then detaches the old lease. Compatible requests share Host sessions and render loops through M3 semantics.
+
+The plugin polls only at its configured 30 or 60 FPS cadence, ignores unchanged transport sequence, heartbeats every eight seconds, and treats a non-advancing session as lost after two seconds. Brief failure retains the last valid frame for 1.5 seconds; afterward the InfoPanel adapter clears it to a transparent explicit unavailable surface. Host-rendered Idle, reconnecting, and source-unavailable frames pass through unchanged.
 
 ## Waveform v1 intent
 
