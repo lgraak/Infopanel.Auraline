@@ -1,12 +1,12 @@
 # Auraline Portability Audit Handoff
 
 Date: 2026-08-25 08:55:34 -07:00
-Status: Completed locally; publication evidence pending
+Status: Completed and published; publication-evidence reconciliation follows
 Model: GPT-5 Codex
 Effort: High
 Repository: InfoPanel.Auraline at `D:\Aeons\Git\Infopanel.Auraline`
 Branch: `main`
-HEAD: `1aa8ebe034d02950ae2bb997ca6ab15cce3f5ed7` at preflight; implementation commit pending
+HEAD: `6a1ed094a5297f447966a453af8d825609f5003d` when implementation publication evidence was captured
 Authoritative remote: `origin` at `https://github.com/lgraak/Infopanel.Auraline.git`
 
 > This handoff is a continuation checkpoint, not authoritative truth. Current
@@ -35,10 +35,10 @@ Audit the complete M1 solution for Windows-specific coupling, correct bounded le
 
 ## Current Repository State
 
-- Branch and HEAD: `main`; preflight `HEAD` was `1aa8ebe034d02950ae2bb997ca6ab15cce3f5ed7` (`Record Auraline M1 publication evidence`). Implementation commit: `IMPLEMENTATION_COMMIT_PENDING`.
-- Working tree: only the intended portability code, tests, documentation, ADR, and this handoff are present before publication.
+- Branch and HEAD: `main`; preflight `HEAD` was `1aa8ebe034d02950ae2bb997ca6ab15cce3f5ed7` (`Record Auraline M1 publication evidence`). The published implementation commit is `6a1ed094a5297f447966a453af8d825609f5003d` (`Isolate Auraline platform dependencies`).
+- Working tree: clean after the implementation commit; this publication-evidence reconciliation is the only follow-up change.
 - Upstream and synchronization: a fresh `git fetch --prune origin` completed; preflight local `HEAD` and `origin/main` matched with divergence `0 0`.
-- Commit and authoritative remote readback: `PUBLICATION_PENDING`.
+- Commit and authoritative remote readback: `git push origin main` advanced authoritative `origin/main` from `1aa8ebe034d02950ae2bb997ca6ab15cce3f5ed7` to `6a1ed094a5297f447966a453af8d825609f5003d`; `git ls-remote origin refs/heads/main` returned the same full implementation SHA. This handoff reconciliation follows because a Git commit cannot contain its own SHA.
 - Preserved unrelated changes: none existed at preflight; no reset, stash, clean, overwrite, or destructive synchronization occurred.
 
 ## Current Known-Good State
@@ -110,7 +110,7 @@ Audit the complete M1 solution for Windows-specific coupling, correct bounded le
 - `dotnet test InfoPanel.Auraline.sln --configuration Debug --no-build --no-restore`: passed, 22/22.
 - `dotnet format InfoPanel.Auraline.sln --verify-no-changes --no-restore`: passed.
 - `git diff --check`: passed; only expected working-copy line-ending conversion notices were emitted.
-- `gitleaks dir . --no-banner --redact` with Gitleaks 8.30.1: scanned approximately 701 KB; no leaks found.
+- `gitleaks dir . --no-banner --redact` with Gitleaks 8.30.1: final pre-publication scan covered approximately 716 KB; no leaks found.
 - Release runtime: responsive process with `MainWindowHandle == 0`; loopback listener only at `127.0.0.1:48481`; `/health` returned `healthy`, version `1.0.0-m1`, one enabled/connected provider, one source, and no configuration error.
 - Duplicate runtime: second Release apphost exited within five seconds and only the original PID remained, covering the unchanged open-signal path.
 - Per-user/runtime readback: schema-v1 configuration remained under `%LOCALAPPDATA%\Auraline\config\host.json`; the existing quoted HKCU Run value still pointed to the Release apphost. The validation Host was stopped and no Auraline process remained.
@@ -120,8 +120,8 @@ Audit the complete M1 solution for Windows-specific coupling, correct bounded le
 ## Production State Versus Repository State
 
 - Implemented: explicit Windows platform boundaries, path and single-instance interfaces, testable HKCU adapter, tests, ADR, architecture, roadmap, and support-language reconciliation.
-- Committed: `IMPLEMENTATION_COMMIT_PENDING`.
-- Pushed: `PUBLICATION_PENDING`.
+- Committed: `6a1ed094a5297f447966a453af8d825609f5003d` (`Isolate Auraline platform dependencies`), including the code, tests, ADR, documentation, and initial handoff.
+- Pushed: the same full implementation SHA was verified on authoritative `origin/main`; this publication-evidence reconciliation follows as a separate scoped commit.
 - Deployed or activated: no installed application or production deployment. Runtime validation used the repository Release build and preserved existing per-user Auraline configuration/startup state.
 - Runtime-validated: Windows tray-only process shape, loopback listener/health, live provider connection/discovery, duplicate admission, per-user path, startup value, and clean shutdown.
 - Documented or planned only: Linux Host/tray/autostart/XDG paths/packaging/InfoPanel validation and all M2 waveform functionality.
