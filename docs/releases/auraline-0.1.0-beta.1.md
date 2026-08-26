@@ -30,7 +30,7 @@ Auraline is the visualization and configuration layer between Resonance Signal a
 
 ## Installation
 
-Download `Auraline-0.1.0-beta.1-win-x64.zip`, verify its SHA-256 checksum, and follow the included README or the repository [installation guide](../../README.md#install-the-beta).
+Download `Auraline-0.1.0-beta.1-win-x64.zip`, verify its SHA-256 checksum, and follow the included README or the repository [installation guide](https://github.com/lgraak/Infopanel.Auraline#install-the-beta).
 
 In short: copy `Host` to a stable per-user folder, start `Auraline.Host.exe`, fully exit InfoPanel through its tray **Exit** command, then copy the complete `InfoPanel.Plugin\InfoPanel.Auraline` folder to `%ProgramData%\InfoPanel\plugins\InfoPanel.Auraline`. Start the compatible InfoPanel build, choose an Auraline profile, and add the **Auraline Waveform** image output.
 
@@ -44,7 +44,7 @@ In short: copy `Host` to a stable per-user folder, start `Auraline.Host.exe`, fu
 
 ## Reporting problems
 
-Open Auraline Host **Diagnostics**, run **Host self-test**, and use **Export diagnostics**. The export is redacted and excludes raw audio, waveform samples, and rendered pixels. Attach it with the repository [beta report template](../beta-report-template.md) to a GitHub issue.
+Open Auraline Host **Diagnostics**, run **Host self-test**, and use **Export diagnostics**. The export is redacted and excludes raw audio, waveform samples, and rendered pixels. Attach it with the repository [beta report template](https://github.com/lgraak/Infopanel.Auraline/blob/main/docs/beta-report-template.md) to a GitHub issue.
 
 ## Checksums
 
