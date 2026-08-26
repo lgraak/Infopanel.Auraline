@@ -1,5 +1,9 @@
 # Auraline branding assets
 
+`auraline-banner.png` is the approved wide artwork for the public repository
+README. Preserve the supplied `2172x724` PNG unchanged; it is separate from the
+canonical product mark and is not an application or tray icon source.
+
 `auraline-mark.png` is the canonical Auraline product artwork supplied and owned
 by the project. Preserve it at its original `1254x1254` resolution and do not
 overwrite it while generating derivatives.

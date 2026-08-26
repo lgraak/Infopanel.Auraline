@@ -1,6 +1,6 @@
 # Auraline
 
-![Auraline product mark](assets/branding/auraline-mark.png)
+![Auraline audio visualization banner](assets/branding/auraline-banner.png)
 
 Auraline is the visualization and configuration layer between [Resonance Signal](https://github.com/lgraak/resonance-signal) and [InfoPanel](https://github.com/habibrehmansg/infopanel). Resonance Signal supplies live audio waveform data; Auraline turns it into transparent, exact-size visualization frames that InfoPanel can display.
 
