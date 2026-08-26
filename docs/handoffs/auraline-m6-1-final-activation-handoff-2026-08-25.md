@@ -1,12 +1,12 @@
 # Auraline M6.1 Final Activation Handoff
 
-Date: 2026-08-25T17:23:25.9113601-07:00
-Status: runtime acceptance completed; evidence not yet committed or published
+Date: 2026-08-25T17:27:00-07:00
+Status: completed and published through the final-acceptance checkpoint; this publication-evidence reconciliation follows it
 Model: GPT-5 Codex
 Effort: High
 Repository: InfoPanel.Auraline
 Branch: `main`
-HEAD: `e31c1d181261a941e0e8cdc860f6473197967778` (pre-evidence checkpoint)
+HEAD: `b78c8b1ea06cb6d6e5c86429747870b0460b4430` (published final-acceptance checkpoint; this reconciliation follows it)
 Authoritative remote: `origin` at `https://github.com/lgraak/Infopanel.Auraline.git`
 
 > This handoff is a continuation checkpoint, not authoritative truth. Current
@@ -53,17 +53,20 @@ accepted branding change was made.
 
 ## Current Repository State
 
-- Branch and pre-evidence HEAD: clean `main` at
-  `e31c1d181261a941e0e8cdc860f6473197967778`.
-- Existing unpublished commits:
+- Published final-acceptance checkpoint: clean `main` at
+  `b78c8b1ea06cb6d6e5c86429747870b0460b4430` before this reconciliation.
+- Published M6.1 commits:
   `a46e085b218b917fec9c9b1d3122b07ac2f2868c` (`Integrate Auraline branding`)
   and `e31c1d181261a941e0e8cdc860f6473197967778`
-  (`Record Auraline M6.1 branding evidence`).
-- Upstream and synchronization before this evidence file: `origin/main` at
-  `e2481f963716b7de6d5e3932efc26cbb075d2774`, divergence `2 0`, confirmed by
-  fresh fetch and `git ls-remote`.
-- Commit and authoritative remote readback: pending for this evidence-only
-  checkpoint.
+  (`Record Auraline M6.1 branding evidence`), followed by
+  `b78c8b1ea06cb6d6e5c86429747870b0460b4430`
+  (`Record Auraline M6.1 final acceptance`).
+- Normal fast-forward push advanced `origin/main` from
+  `e2481f963716b7de6d5e3932efc26cbb075d2774` to `b78c8b1`. Fresh fetch,
+  local `HEAD`, `origin/main`, and `git ls-remote origin refs/heads/main` all
+  matched `b78c8b1`; divergence was `0 0` before this evidence reconciliation.
+- This evidence-only publication reconciliation follows the published
+  acceptance checkpoint and requires its own normal push/readback.
 - Preserved unrelated changes: none; build outputs and `dist/` remain ignored.
 
 ## Current Known-Good State
@@ -172,17 +175,20 @@ accepted branding change was made.
 - `dotnet format ... --verify-no-changes --no-restore`: passed.
 - Gitleaks: 25 commits and about 820.78 KB scanned; no leaks.
 - ZIP `checksums.txt`: all listed files passed SHA-256 verification.
-- `git diff --check`: passed before this handoff; final staged check remains part
-  of the commit gate.
+- `git diff --check` and staged diff review: passed; the acceptance commit added
+  only this evidence handoff.
+- Acceptance publication/readback: normal push advanced authoritative `main` to
+  `b78c8b1`; fresh fetch and `ls-remote` matched with divergence `0 0`.
 - Not run: another physical clean Windows machine, a public compatible InfoPanel
   build, Linux, LAN consumers, installer/updater, or the full M4/M5 matrix.
 
 ## Production State Versus Repository State
 
 - Implemented: branded M6.1 product/package behavior at `a46e085`.
-- Committed: branding implementation and branding evidence through `e31c1d1`;
-  this final-activation evidence is not yet committed.
-- Pushed: authoritative `origin/main` remains `e2481f9` before final publication.
+- Committed: branding implementation, branding evidence, and final-activation
+  evidence through `b78c8b1`; this reconciliation follows it.
+- Pushed: authoritative `origin/main` reached `b78c8b1` with verified divergence
+  `0 0` before this reconciliation.
 - Deployed or activated: exact final four-file plugin and byte-identical final
   packaged Host are active locally.
 - Runtime-validated: compatible InfoPanel, active/idle rendering, transparency,
@@ -225,5 +231,5 @@ accepted branding change was made.
 
 ## Next Recommended Action
 
-Commit this evidence-only checkpoint, fetch `origin`, publish the clean
-fast-forward to `main`, and verify authoritative zero-divergence readback.
+Begin a small controlled beta feedback phase once a compatible InfoPanel build
+containing the consumer-dimension prerequisite can be distributed to testers.
