@@ -1,0 +1,15 @@
+schema_version = 1
+
+project_id = "lgraak/Infopanel.Auraline"
+project_repository = "https://github.com/lgraak/Infopanel.Auraline.git"
+
+standards_authority = "aeons/project-standards"
+standards_revision = "46278c6b5d5f1ea687c16fce473967e402fa3c52"
+
+bootstrap_standard = "standards/project-bootstrap-standard-v1.md"
+prompt_standard = "standards/project-prompt-standard-v1.md"
+handoff_standard = "standards/project-handoff-standard-v1.md"
+
+project_instructions = "AGENTS.md"
+handoff_directory = "docs/handoffs"
+adopted_on = "2026-08-31"
