@@ -154,6 +154,8 @@ Provider/source rebinding is conservative: exact identity is preferred, high-con
 
 The Host performs all rendering; the InfoPanel plugin does not process waveform samples. Rendering accepts dynamic dimensions. M2 exposes the latest rendered frame as a no-cache PNG on the loopback diagnostics surface solely for live inspection; it encodes the real renderer output and is not a render session or frame-transport contract.
 
+`WaveformRenderer` is a stateless singleton that may be invoked concurrently by waveform processing, multiple render sessions, profile previews, and diagnostics. Every native-backed Skia object created for a render or PNG encode is invocation-local and deterministically disposed before the call returns; no Skia object is shared across calls or retained by the renderer. This ownership rule avoids finalizer-dependent native lifetime under sustained rendering without adding serialization or changing pixels.
+
 Render sessions are created lazily and are keyed by profile, dimensions, and compatible cadence. One scheduler and transport publisher serve all consumers of a compatible session. Localhost HTTP performs versioned attach, heartbeat, detach, and diagnostics; high-rate pixels use one shared-memory allocation per session behind platform-neutral publication/reader contracts. See [ADR-0005](decisions/0005-shared-memory-frame-transport.md) and [ADR-0007](decisions/0007-auraline-frame-transport-abstraction.md).
 
 After the last consumer leaves, a session receives a 15-second grace period before teardown. An internal configurable safety cap limits concurrent sessions. If the cap is reached, idle sessions may be evicted before rejecting a new request; active sessions are never evicted to admit another session.

@@ -161,6 +161,63 @@ public sealed class RenderSessionManagerTests
         Assert.Equal(attachment.Session.SessionId, diagnostic.SessionId);
     }
 
+    [Fact]
+    public async Task MultipleSchedulersSurviveHotApplyAndRepeatedTeardownAtThirtyAndSixtyFps()
+    {
+        for (var cycle = 0; cycle < 3; cycle++)
+        {
+            var profiles = new MutableProfiles();
+            var transports = new FakeTransportFactory();
+            var manager = new RenderSessionManager(
+                transports,
+                new FakeWaveformSource(),
+                new WaveformRenderer(),
+                new StressClock(),
+                new RenderSessionOptions(32, TimeSpan.FromSeconds(25), TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(1)),
+                NullLogger<RenderSessionManager>.Instance,
+                profiles);
+
+            try
+            {
+                manager.Attach(ProductDefaults.DefaultProfileId, 64, 32, 30, ContractVersion.Current);
+                manager.Attach(ProductDefaults.DefaultProfileId, 80, 40, 60, ContractVersion.Current);
+                manager.Attach(ProductDefaults.DefaultProfileId, 96, 48, 30, ContractVersion.Current);
+                manager.Attach(ProductDefaults.DefaultProfileId, 112, 56, 60, ContractVersion.Current);
+
+                Assert.True(SpinWait.SpinUntil(() => transports.PublishedCount >= 100, TimeSpan.FromSeconds(10)));
+
+                for (var revision = 2; revision <= 20; revision++)
+                {
+                    profiles.Profile = profiles.Profile with
+                    {
+                        Revision = revision,
+                        Waveform = profiles.Profile.Waveform with
+                        {
+                            Color = revision % 2 == 0 ? "#FF5533" : "#76B9FF",
+                            SmoothingEnabled = revision % 3 == 0,
+                            SmoothingAmount = revision % 3 == 0 ? 0.7 : 0
+                        }
+                    };
+                }
+
+                Assert.True(SpinWait.SpinUntil(
+                    () => transports.PublishedCount >= 300 &&
+                        manager.GetDiagnostics().Sessions.All(session => session.HotApplyCount > 0),
+                    TimeSpan.FromSeconds(10)));
+                Assert.Equal(4, manager.GetDiagnostics().ActiveSessionCount);
+                Assert.Contains(manager.GetDiagnostics().Sessions, session => session.TargetFps == 30);
+                Assert.Contains(manager.GetDiagnostics().Sessions, session => session.TargetFps == 60);
+            }
+            finally
+            {
+                await manager.DisposeAsync();
+            }
+
+            Assert.Equal(4, transports.CreatedCount);
+            Assert.Equal(4, transports.DisposedCount);
+        }
+    }
+
     private sealed class Fixture(int cap = 32)
     {
         public FakeClock Clock { get; } = new();
@@ -178,12 +235,18 @@ public sealed class RenderSessionManagerTests
 
     private sealed class MutableProfiles : IProfileCatalog
     {
-        public ProfileDefinition Profile { get; set; } = new()
+        private ProfileDefinition _profile = new()
         {
             Id = ProductDefaults.DefaultProfileId,
             FriendlyName = "Default Waveform",
             SourceGroupId = ProductDefaults.DefaultSourceGroupId
         };
+
+        public ProfileDefinition Profile
+        {
+            get => Volatile.Read(ref _profile);
+            set => Volatile.Write(ref _profile, value);
+        }
 
         public IReadOnlyList<ProfileDefinition> GetProfiles() => [Profile];
         public ProfileDefinition GetProfile(string profileId) => profileId == Profile.Id ? Profile : throw new KeyNotFoundException();
@@ -195,6 +258,17 @@ public sealed class RenderSessionManagerTests
         public DateTimeOffset UtcNow => _now;
         public void Advance(TimeSpan duration) => _now += duration;
         public Task Delay(TimeSpan delay, CancellationToken cancellationToken) => Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+    }
+
+    private sealed class StressClock : IRenderSessionClock
+    {
+        public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
+
+        public async Task Delay(TimeSpan delay, CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
+        }
     }
 
     private sealed class FakeWaveformSource : IWaveformRenderStateSource

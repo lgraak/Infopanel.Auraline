@@ -52,7 +52,7 @@ public sealed class WaveformRenderer
 
         if (samples.Length > 0)
         {
-            var path = BuildPath(samples, targetWidth, targetHeight);
+            using var path = BuildPath(samples, targetWidth, targetHeight);
             canvas.DrawPath(path, strokePaint);
         }
 

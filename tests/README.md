@@ -10,4 +10,6 @@ M5 adds Host tests for product bootstrap/migration, atomic persistence, malforme
 
 M6 adds diagnostics tests for deterministic identifier/secret redaction, temporary Info/Debug switching, stable major error categories, coherent prerelease version exposure, and beta-package guardrails. Package acceptance separately verifies the framework-dependent Host, exact four-file plugin boundary, checksum manifest, and combined archive.
 
+RB1 adds a source-level Skia path-disposal regression guard, concurrent shared-renderer coverage across all visual states and PNG preview encoding, repeated multi-session 30/60 FPS hot-apply/teardown stress, and a bounded high-rate renderer soak. The soak runs for one second during the normal suite; set `AURALINE_RENDERER_SOAK_SECONDS` to a value from 1 through 300 when a longer diagnostic run is required.
+
 `Auraline.TransportProbe` is a separate executable rather than an in-process unit test. With Host running, it negotiates through `/api/v1`, opens the returned Windows mapping, validates the RGBA8888-premultiplied geometry, observes sequence and pixel advancement, heartbeats for longer runs, and detaches. Pass `--profile-id <stable-id>` to exercise a saved M5 profile or `--abrupt` to leave lease cleanup to expiry. It is not the InfoPanel plugin.
