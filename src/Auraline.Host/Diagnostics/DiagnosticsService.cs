@@ -44,6 +44,7 @@ public sealed record DiagnosticsSnapshot(
     IReadOnlyList<ProfileDefinition> Profiles,
     SelfTestResult? LatestSelfTest,
     string? LatestMeaningfulError,
+    StallObservabilitySnapshot StallObservability,
     string ExternalReleaseGate);
 
 public sealed record DiagnosticsExport(string FileName, byte[] Content);
@@ -84,7 +85,8 @@ public sealed class DiagnosticsService(
     WaveformRenderer renderer,
     AuralinePaths paths,
     DiagnosticLogLevel logLevel,
-    DiagnosticsRedactor redactor)
+    DiagnosticsRedactor redactor,
+    StallObservability stallObservability)
 {
     public const string ExternalReleaseGate = "Public beta distribution requires an InfoPanel build containing the generic plugin image consumer-dimension capability used by InfoPanel.Auraline.";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true, Converters = { new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower) } };
@@ -102,7 +104,7 @@ public sealed class DiagnosticsService(
         return new(HostStatusService.Version, "beta", ContractVersion.Current, 1,
             RuntimeInformation.OSDescription, RuntimeInformation.FrameworkDescription,
             RuntimeInformation.RuntimeIdentifier, logLevel.Current, health, providerStates, groups,
-            products.GetProfiles(), _latestSelfTest, error, ExternalReleaseGate);
+            products.GetProfiles(), _latestSelfTest, error, stallObservability.GetSnapshot(), ExternalReleaseGate);
     }
 
     public async Task<SelfTestResult> RunSelfTestAsync(CancellationToken cancellationToken)
@@ -223,6 +225,8 @@ public sealed class DiagnosticsService(
             $"- Default profile: {s.Health.ProductConfiguration?.DefaultProfileId ?? "—"}",
             $"- Render sessions/leases: {sessions?.ActiveSessionCount ?? 0}/{sessions?.TotalConsumerLeases ?? 0}",
             $"- Reconnects: provider {s.Providers.Sum(item => item.ReconnectCount)}; waveform {waveformHealth?.ReconnectAttempts ?? 0}",
+            $"- Runtime GC: gen0 {s.StallObservability.RuntimeGc.Gen0Collections}; gen1 {s.StallObservability.RuntimeGc.Gen1Collections}; gen2 {s.StallObservability.RuntimeGc.Gen2Collections}; total pause {s.StallObservability.RuntimeGc.TotalPauseDurationMs?.ToString("F3") ?? "unavailable"} ms",
+            $"- Significant timing events retained: {s.StallObservability.SignificantEvents.Count}/{s.StallObservability.EventCapacity}",
             $"- Latest self-test: {s.LatestSelfTest?.OverallResult ?? "not run"}",
             $"- Latest meaningful error: {s.LatestMeaningfulError ?? "none"}",
             "", "No audio samples, waveform samples, or rendered frame pixels are included. Obvious local identifiers are redacted."
@@ -244,6 +248,7 @@ public sealed class DiagnosticsService(
             AddJson(archive, "source-groups.json", snapshot.SourceGroups);
             AddJson(archive, "profiles.json", snapshot.Profiles.Select(item => new { item.SchemaVersion, item.Id, item.FriendlyName, item.SourceGroupId, item.Revision, item.VisualizationType }));
             AddJson(archive, "render-sessions.json", snapshot.Health.RenderSessions);
+            AddJson(archive, "stall-observability.json", snapshot.StallObservability);
             AddJson(archive, "self-test.json", snapshot.LatestSelfTest);
             AddJson(archive, "configuration.json", new { HostSchemaVersion = 1, ProductSchemaVersion = ProductCatalogDocument.CurrentSchemaVersion, snapshot.Health.ProductConfiguration });
             AddText(archive, "privacy.txt", "No audio samples, waveform samples, or rendered frame pixels are included. Obvious user, profile-path, hostname, and secret-like values are redacted by default. Logs may contain technical endpoint, provider, source, and profile names.");

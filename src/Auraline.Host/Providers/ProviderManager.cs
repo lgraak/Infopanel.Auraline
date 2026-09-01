@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Auraline.Host.Configuration;
+using Auraline.Host.Diagnostics;
 
 namespace Auraline.Host.Providers;
 
@@ -12,16 +13,19 @@ public sealed class ProviderManager : IHostedService, IDisposable
     private readonly IAsyncDelay _delay;
     private readonly ILogger<ProviderManager> _logger;
     private readonly ProductConfigurationStore? _products;
+    private readonly StallObservability? _observability;
     private readonly ConcurrentDictionary<string, Runtime> _runtimes = new(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource? _hostCancellation;
 
-    public ProviderManager(ConfigurationStore configuration, IProviderConnector connector, IAsyncDelay delay, ILogger<ProviderManager> logger, ProductConfigurationStore? products = null)
+    public ProviderManager(ConfigurationStore configuration, IProviderConnector connector, IAsyncDelay delay, ILogger<ProviderManager> logger,
+        ProductConfigurationStore? products = null, StallObservability? observability = null)
     {
         _configuration = configuration;
         _connector = connector;
         _delay = delay;
         _logger = logger;
         _products = products;
+        _observability = observability;
     }
 
     public IReadOnlyList<ProviderStatus> GetStatuses() => _runtimes.Values.Select(runtime => runtime.Snapshot()).OrderBy(p => p.FriendlyName).ToArray();
@@ -123,6 +127,7 @@ public sealed class ProviderManager : IHostedService, IDisposable
         await runtime.StopAsync();
         runtime.SetState(ProviderLifecycleState.Disconnected, runtime.Snapshot().LastError);
         StartRuntime(runtime);
+        _observability?.Record("provider_reconnect", reason: $"{providerId}:manual");
         _logger.LogInformation("Manual reconnect requested for provider {ProviderId}", providerId);
     }
 
@@ -189,7 +194,9 @@ public sealed class ProviderManager : IHostedService, IDisposable
                 var error = ConciseError(ex);
                 runtime.SetState(ProviderLifecycleState.Reconnecting, error);
                 var retryDelay = backoff.NextDelay();
-                runtime.RecordReconnect(retryDelay);
+                runtime.RecordReconnect(retryDelay, error);
+                _observability?.Record("provider_reconnect", durationMs: retryDelay.TotalMilliseconds,
+                    reason: $"{runtime.Configuration.Id}:{error}");
                 consecutiveFailures++;
                 if (consecutiveFailures <= 4 || (consecutiveFailures - 4) % 12 == 0)
                     _logger.LogWarning("Provider {ProviderId} unavailable ({Reason}); retrying in {RetryDelay}", runtime.Configuration.Id, error, retryDelay);
@@ -244,6 +251,8 @@ public sealed class ProviderManager : IHostedService, IDisposable
         private Task? _task;
         private long _reconnectCount;
         private TimeSpan? _retryDelay;
+        private DateTimeOffset? _latestReconnectAtUtc;
+        private string? _latestReconnectReason;
 
         public Runtime(ProviderConfiguration configuration)
         {
@@ -295,9 +304,15 @@ public sealed class ProviderManager : IHostedService, IDisposable
             }
         }
 
-        public void RecordReconnect(TimeSpan retryDelay)
+        public void RecordReconnect(TimeSpan retryDelay, string reason)
         {
-            lock (_gate) { _reconnectCount++; _retryDelay = retryDelay; }
+            lock (_gate)
+            {
+                _reconnectCount++;
+                _retryDelay = retryDelay;
+                _latestReconnectAtUtc = DateTimeOffset.UtcNow;
+                _latestReconnectReason = reason;
+            }
         }
 
         public void UpdateSourceMetadata(string sourceId, int channelCount, int sampleRateHz)
@@ -328,7 +343,7 @@ public sealed class ProviderManager : IHostedService, IDisposable
         {
             lock (_gate) return new(_configuration.Id, _configuration.FriendlyName, _configuration.Endpoint,
                 _configuration.Enabled, _state, _lastError, _lastConnectedAt, _revision, _sources.ToArray(),
-                _reconnectCount, _retryDelay?.TotalMilliseconds);
+                _reconnectCount, _retryDelay?.TotalMilliseconds, _latestReconnectAtUtc, _latestReconnectReason);
         }
 
         public void Dispose() => _cancellation?.Dispose();

@@ -62,6 +62,9 @@ public static class Program
             builder.Services.AddSingleton(logLevelSwitch);
             builder.Services.AddSingleton<DiagnosticLogLevel>();
             builder.Services.AddSingleton<DiagnosticsRedactor>();
+            builder.Services.AddSingleton<IObservabilityClock, SystemObservabilityClock>();
+            builder.Services.AddSingleton<IRuntimeGcMetricsProvider, SystemRuntimeGcMetricsProvider>();
+            builder.Services.AddSingleton<StallObservability>();
             builder.Services.AddSingleton<IWaveformSelfTester, WaveformSelfTestClient>();
             builder.Services.AddSingleton<DiagnosticsService>();
             builder.Services.AddSingleton(configuration);

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json.Serialization;
 using Auraline.Contracts;
 using Auraline.Host.Configuration;
+using Auraline.Host.Diagnostics;
 using Auraline.Host.Waveform;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -48,6 +49,20 @@ public sealed record RenderSessionDiagnostic(
     [property: JsonPropertyName("published_sequence")] ulong PublishedSequence,
     [property: JsonPropertyName("latest_render_duration_ms")] double? LatestRenderDurationMs,
     [property: JsonPropertyName("average_render_duration_ms")] double? AverageRenderDurationMs,
+    [property: JsonPropertyName("target_frame_interval_ms")] double TargetFrameIntervalMs,
+    [property: JsonPropertyName("scheduled_deadline_monotonic_ms")] double? ScheduledDeadlineMonotonicMs,
+    [property: JsonPropertyName("latest_render_start_monotonic_ms")] double? LatestRenderStartMonotonicMs,
+    [property: JsonPropertyName("latest_scheduler_lateness_ms")] double? LatestSchedulerLatenessMs,
+    [property: JsonPropertyName("maximum_scheduler_lateness_ms")] double MaximumSchedulerLatenessMs,
+    [property: JsonPropertyName("scheduler_lateness_counts")] StallThresholdCounts SchedulerLatenessCounts,
+    [property: JsonPropertyName("latest_publication_monotonic_ms")] double? LatestPublicationMonotonicMs,
+    [property: JsonPropertyName("latest_publication_interval_ms")] double? LatestPublicationIntervalMs,
+    [property: JsonPropertyName("maximum_publication_interval_ms")] double MaximumPublicationIntervalMs,
+    [property: JsonPropertyName("maximum_publication_interval_sequence")] ulong? MaximumPublicationIntervalSequence,
+    [property: JsonPropertyName("publication_interval_counts")] StallThresholdCounts PublicationIntervalCounts,
+    [property: JsonPropertyName("latest_renderer_duration_ms")] double? LatestRendererDurationMs,
+    [property: JsonPropertyName("latest_transport_publication_duration_ms")] double? LatestTransportPublicationDurationMs,
+    [property: JsonPropertyName("latest_render_to_publish_duration_ms")] double? LatestRenderToPublishDurationMs,
     [property: JsonPropertyName("allocation_size")] long AllocationSize,
     [property: JsonPropertyName("consumer_count")] int ConsumerCount,
     [property: JsonPropertyName("state")] string State,
@@ -77,6 +92,7 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
     private readonly RenderSessionOptions _options;
     private readonly ILogger<RenderSessionManager> _logger;
     private readonly IProfileCatalog? _profiles;
+    private readonly StallObservability _observability;
     private CancellationTokenSource? _maintenanceCancellation;
     private Task? _maintenanceTask;
     private long _creationCount;
@@ -92,7 +108,8 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
         IRenderSessionClock clock,
         RenderSessionOptions options,
         ILogger<RenderSessionManager> logger,
-        IProfileCatalog? profiles = null)
+        IProfileCatalog? profiles = null,
+        StallObservability? observability = null)
     {
         if (options.SessionCap <= 0) throw new ArgumentOutOfRangeException(nameof(options));
         _transportFactory = transportFactory;
@@ -102,6 +119,7 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
         _options = options;
         _logger = logger;
         _profiles = profiles;
+        _observability = observability ?? new StallObservability(new SystemObservabilityClock());
     }
 
     public RenderSessionAttachment Attach(string profileId, int width, int height, int targetFps, ContractVersion consumerVersion)
@@ -140,7 +158,7 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
 
                 evicted?.StopAsync().GetAwaiter().GetResult();
                 var transport = _transportFactory.Create(width, height, targetFps);
-                session = new SessionRuntime(lookupKey, transport, _waveform, _renderer, _clock, _logger, _profiles, now);
+                session = new SessionRuntime(lookupKey, transport, _waveform, _renderer, _clock, _logger, _profiles, _observability, now);
                 _sessions.Add(lookupKey, session);
                 _creationCount++;
             }
@@ -344,6 +362,12 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
         return scheduled <= now ? now + interval : scheduled;
     }
 
+    internal static double CalculateSchedulerLateness(IObservabilityClock clock, long deadlineTimestamp, long actualTimestamp) =>
+        Math.Max(0, clock.ElapsedMilliseconds(deadlineTimestamp, actualTimestamp));
+
+    internal static double CalculatePublicationInterval(IObservabilityClock clock, long previousTimestamp, long currentTimestamp) =>
+        Math.Max(0, clock.ElapsedMilliseconds(previousTimestamp, currentTimestamp));
+
     private readonly record struct SessionLookupKey(RenderSessionKey SemanticKey, int TargetFps);
 
     private sealed class SessionRuntime
@@ -355,6 +379,7 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
         private readonly IRenderSessionClock _clock;
         private readonly ILogger _logger;
         private readonly IProfileCatalog? _profiles;
+        private readonly StallObservability _observability;
         private readonly CancellationTokenSource _cancellation = new();
         private Task? _renderTask;
         private long _renderedFrames;
@@ -363,6 +388,20 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
         private double? _averageDurationMs;
         private long _profileRevision = 1;
         private long _hotApplyCount;
+        private readonly double _targetFrameIntervalMs;
+        private long? _scheduledDeadlineTimestamp;
+        private long? _latestRenderStartTimestamp;
+        private double? _latestSchedulerLatenessMs;
+        private double _maximumSchedulerLatenessMs;
+        private StallThresholdCounts _schedulerLatenessCounts = new(0, 0, 0, 0);
+        private long? _latestPublicationTimestamp;
+        private double? _latestPublicationIntervalMs;
+        private double _maximumPublicationIntervalMs;
+        private ulong? _maximumPublicationIntervalSequence;
+        private StallThresholdCounts _publicationIntervalCounts = new(0, 0, 0, 0);
+        private double? _latestRendererDurationMs;
+        private double? _latestTransportPublicationDurationMs;
+        private double? _latestRenderToPublishDurationMs;
 
         public SessionRuntime(
             SessionLookupKey lookupKey,
@@ -372,6 +411,7 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
             IRenderSessionClock clock,
             ILogger logger,
             IProfileCatalog? profiles,
+            StallObservability observability,
             DateTimeOffset createdAtUtc)
         {
             LookupKey = lookupKey;
@@ -381,6 +421,8 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
             _clock = clock;
             _logger = logger;
             _profiles = profiles;
+            _observability = observability;
+            _targetFrameIntervalMs = 1000d / lookupKey.TargetFps;
             if (_profiles is not null) _profileRevision = _profiles.GetProfile(lookupKey.SemanticKey.ProfileId).Revision;
             CreatedAtUtc = createdAtUtc;
             LastAccessUtc = createdAtUtc;
@@ -438,6 +480,20 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
                     _sequence,
                     _latestDurationMs,
                     _averageDurationMs,
+                    _targetFrameIntervalMs,
+                    _scheduledDeadlineTimestamp is { } deadline ? _observability.Clock.ToMilliseconds(deadline) : null,
+                    _latestRenderStartTimestamp is { } renderStart ? _observability.Clock.ToMilliseconds(renderStart) : null,
+                    _latestSchedulerLatenessMs,
+                    _maximumSchedulerLatenessMs,
+                    _schedulerLatenessCounts,
+                    _latestPublicationTimestamp is { } publication ? _observability.Clock.ToMilliseconds(publication) : null,
+                    _latestPublicationIntervalMs,
+                    _maximumPublicationIntervalMs,
+                    _maximumPublicationIntervalSequence,
+                    _publicationIntervalCounts,
+                    _latestRendererDurationMs,
+                    _latestTransportPublicationDurationMs,
+                    _latestRenderToPublishDurationMs,
                     _transport.Descriptor.AllocationSize,
                     Leases.Count,
                     State.ToString(),
@@ -449,11 +505,15 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
         {
             var interval = TimeSpan.FromSeconds(1d / LookupKey.TargetFps);
             var nextDeadline = _clock.UtcNow;
+            var observabilityClock = _observability.Clock;
+            var scheduledDeadlineTimestamp = observabilityClock.Timestamp;
             try
             {
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     var stopwatch = Stopwatch.StartNew();
+                    var renderStartTimestamp = observabilityClock.Timestamp;
+                    var schedulerLatenessMs = CalculateSchedulerLateness(observabilityClock, scheduledDeadlineTimestamp, renderStartTimestamp);
                     var snapshot = _waveform.CaptureRenderState();
                     var profile = _profiles?.GetProfile(LookupKey.SemanticKey.ProfileId);
                     if (profile is not null && profile.Revision != _profileRevision)
@@ -469,6 +529,7 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
                     }
                     var sequence = checked(_sequence + 1);
                     var timestamp = _clock.UtcNow;
+                    var rendererStartTimestamp = observabilityClock.Timestamp;
                     var rendered = _renderer.Render(
                         snapshot.ProcessedFrame,
                         snapshot.VisualState,
@@ -479,6 +540,7 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
                         LookupKey.TargetFps,
                         unchecked((int)sequence),
                         profile?.Waveform);
+                    var rendererEndTimestamp = observabilityClock.Timestamp;
                     _transport.Publish(new FramePublication(
                         rendered.Width,
                         rendered.Height,
@@ -489,7 +551,14 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
                         rendered.TimestampTicks,
                         rendered.TargetFps,
                         rendered.Pixels));
+                    var publicationTimestamp = observabilityClock.Timestamp;
                     stopwatch.Stop();
+                    var rendererDurationMs = observabilityClock.ElapsedMilliseconds(rendererStartTimestamp, rendererEndTimestamp);
+                    var publicationDurationMs = observabilityClock.ElapsedMilliseconds(rendererEndTimestamp, publicationTimestamp);
+                    var cycleDurationMs = observabilityClock.ElapsedMilliseconds(renderStartTimestamp, publicationTimestamp);
+                    double? publicationIntervalMs = null;
+                    if (_latestPublicationTimestamp is { } previousPublication)
+                        publicationIntervalMs = CalculatePublicationInterval(observabilityClock, previousPublication, publicationTimestamp);
                     lock (_metricsGate)
                     {
                         _sequence = sequence;
@@ -498,11 +567,34 @@ public sealed class RenderSessionManager : IHostedService, IAsyncDisposable
                         _averageDurationMs = _averageDurationMs is null
                             ? _latestDurationMs
                             : _averageDurationMs.Value * 0.8 + _latestDurationMs.Value * 0.2;
+                        _scheduledDeadlineTimestamp = scheduledDeadlineTimestamp;
+                        _latestRenderStartTimestamp = renderStartTimestamp;
+                        _latestSchedulerLatenessMs = schedulerLatenessMs;
+                        _maximumSchedulerLatenessMs = Math.Max(_maximumSchedulerLatenessMs, schedulerLatenessMs);
+                        _schedulerLatenessCounts = StallObservability.IncrementThresholds(_schedulerLatenessCounts, schedulerLatenessMs);
+                        _latestPublicationTimestamp = publicationTimestamp;
+                        _latestPublicationIntervalMs = publicationIntervalMs;
+                        if (publicationIntervalMs > _maximumPublicationIntervalMs)
+                        {
+                            _maximumPublicationIntervalMs = publicationIntervalMs.Value;
+                            _maximumPublicationIntervalSequence = sequence;
+                        }
+                        if (publicationIntervalMs is { } intervalMs)
+                            _publicationIntervalCounts = StallObservability.IncrementThresholds(_publicationIntervalCounts, intervalMs);
+                        _latestRendererDurationMs = rendererDurationMs;
+                        _latestTransportPublicationDurationMs = publicationDurationMs;
+                        _latestRenderToPublishDurationMs = cycleDurationMs;
                     }
+                    if (schedulerLatenessMs > StallObservability.SignificantTimingThresholdMs)
+                        _observability.Record("scheduler_lateness", SessionId, durationMs: schedulerLatenessMs, sequence: sequence);
+                    if (publicationIntervalMs > StallObservability.SignificantTimingThresholdMs)
+                        _observability.Record("publication_interval", SessionId, durationMs: publicationIntervalMs, sequence: sequence);
 
                     var now = _clock.UtcNow;
                     nextDeadline = CalculateNextDeadline(nextDeadline, interval, now);
-                    await _clock.Delay(nextDeadline - now, cancellationToken).ConfigureAwait(false);
+                    var delay = nextDeadline - now;
+                    scheduledDeadlineTimestamp = observabilityClock.Add(observabilityClock.Timestamp, delay);
+                    await _clock.Delay(delay, cancellationToken).ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

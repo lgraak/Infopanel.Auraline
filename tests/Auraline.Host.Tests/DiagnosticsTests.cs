@@ -35,7 +35,8 @@ public sealed class DiagnosticsTests
             var status = new HostStatusService(configuration, providers, waveform, null, products);
             var service = new DiagnosticsService(status, providers, products, configuration,
                 new AvailableConnector(), new WindowsSharedMemoryFrameTransportFactory(), new AvailableWaveformSelfTester(), renderer, paths,
-                new DiagnosticLogLevel(new LoggingLevelSwitch(LogEventLevel.Information)), new DiagnosticsRedactor());
+                new DiagnosticLogLevel(new LoggingLevelSwitch(LogEventLevel.Information)), new DiagnosticsRedactor(),
+                new StallObservability(new SystemObservabilityClock()));
 
             var result = await service.RunSelfTestAsync(default);
 
@@ -53,6 +54,7 @@ public sealed class DiagnosticsTests
             Assert.Contains("source-groups.json", names);
             Assert.Contains("profiles.json", names);
             Assert.Contains("render-sessions.json", names);
+            Assert.Contains("stall-observability.json", names);
             Assert.Contains("self-test.json", names);
             Assert.Contains("privacy.txt", names);
             var contents = string.Join("\n", archive.Entries.Select(ReadEntry));

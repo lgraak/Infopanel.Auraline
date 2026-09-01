@@ -31,7 +31,9 @@ public sealed record ProviderStatus(
     string? DiscoveryRevision,
     IReadOnlyList<ProviderSource> Sources,
     long ReconnectCount = 0,
-    double? RetryDelayMs = null);
+    double? RetryDelayMs = null,
+    DateTimeOffset? LatestReconnectAtUtc = null,
+    string? LatestReconnectReason = null);
 
 public sealed record ProviderConnectionResult(string DiscoveryRevision, IReadOnlyList<ProviderSource> Sources);
 

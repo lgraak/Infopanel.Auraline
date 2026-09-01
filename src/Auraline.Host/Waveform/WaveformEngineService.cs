@@ -4,6 +4,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using Auraline.Host.Configuration;
+using Auraline.Host.Diagnostics;
 using Auraline.Host.Providers;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -16,7 +17,8 @@ public sealed class WaveformEngineService(
     WaveformProcessor processor,
     WaveformRenderer renderer,
     WaveformReconnectPolicy reconnectPolicy,
-    ILogger<WaveformEngineService> logger) : IHostedService, IAsyncDisposable, IWaveformEngineStatusProvider, IWaveformRenderStateSource
+    ILogger<WaveformEngineService> logger,
+    StallObservability observability) : IHostedService, IAsyncDisposable, IWaveformEngineStatusProvider, IWaveformRenderStateSource
 {
     private const int DefaultRenderWidth = 320;
     private const int DefaultRenderHeight = 120;
@@ -157,6 +159,7 @@ public sealed class WaveformEngineService(
             try
             {
                 var wsUri = BuildWaveformUri(provider.Endpoint);
+                observability.Record("waveform_open_attempt", streamId: _streamId, reason: wsUri.AbsolutePath);
                 logger.LogInformation("Opening waveform websocket {Uri}", wsUri);
                 SetVisualState(WaveformVisualizationState.Reconnecting, "connecting");
 
@@ -218,6 +221,7 @@ public sealed class WaveformEngineService(
                     if (_hasActiveStream) _streamStops++;
                     _lastError = "websocket closed";
                 }
+                observability.RecordWaveformStopped(_streamId, "websocket closed");
                 CloseStream();
                 SetVisualState(WaveformVisualizationState.Reconnecting, "websocket closed");
                 return WaveformRetryHint.WaitForSource;
@@ -279,6 +283,7 @@ public sealed class WaveformEngineService(
                     if (IsCurrentStream(stopped.StreamId))
                     {
                         lock (_gate) _streamStops++;
+                        observability.RecordWaveformStopped(stopped.StreamId, stopped.Reason);
                         CloseStream();
                         SetVisualState(WaveformVisualizationState.Reconnecting, stopped.Reason);
                         return WaveformRetryHint.WaitForSource;
@@ -293,6 +298,7 @@ public sealed class WaveformEngineService(
                         _retryState = error.RetryHint.ToString();
                         _lastError = $"{error.Kind}:{error.ScopeType}:{error.ScopeId}";
                     }
+                    observability.RecordWaveformStopped(_streamId, $"{error.Kind}:{error.ScopeType}:{error.ScopeId}");
                     CloseStream();
                     SetVisualState(WaveformVisualizationState.Reconnecting, error.Kind);
                     if (error.RetryHint == WaveformRetryHint.DoNotRetry)
@@ -412,6 +418,7 @@ public sealed class WaveformEngineService(
         }
 
         providerManager.UpdateSourceMetadata(HostConfiguration.DefaultProviderId, started.SourceId, started.ChannelCount, started.SampleRateHz);
+        observability.RecordWaveformStarted(started.StreamId, started.SourceId);
         logger.LogInformation("Waveform stream started StreamId={StreamId} SourceId={SourceId}", _streamId, _sourceId);
     }
 
@@ -459,6 +466,8 @@ public sealed class WaveformEngineService(
         }
 
         lock (_gate) _reconnectAttempts = reconnectPolicy.AttemptCount;
+        observability.Record("waveform_reconnect_wait", streamId: _streamId, durationMs: delay == Timeout.InfiniteTimeSpan ? null : delay.TotalMilliseconds,
+            reason: hint.ToString());
         if (delay > TimeSpan.Zero)
             await Task.Delay(delay, cancellationToken);
     }

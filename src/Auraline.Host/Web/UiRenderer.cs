@@ -138,6 +138,7 @@ public static class UiRenderer
         var selfTest = snapshot.LatestSelfTest is null
             ? "<p>Not run during this Host session.</p>"
             : $"<p><strong>{E(snapshot.LatestSelfTest.OverallResult)}</strong> in {snapshot.LatestSelfTest.DurationMs} ms ({E(snapshot.LatestSelfTest.EndedAtUtc.ToString("O"))})</p><table><tbody>{string.Join("", snapshot.LatestSelfTest.Stages.Select(stage => $"<tr><td>{E(stage.Name)}</td><td>{E(stage.Status.ToString())}</td><td>{E(stage.Reason)}</td><td>{stage.DurationMs} ms</td></tr>"))}</tbody></table>";
+        var timing = TimingObservability(snapshot);
         return Page("Diagnostics", theme, $$$"""
         <h1>Diagnostics</h1><p>Current-run evidence for beta troubleshooting. <a href=/health>Concise health API</a> · <a href=/api/v1/diagnostics>Diagnostics API</a></p>
         <section><h2>Beta Readiness</h2><ul><li>Host: <strong>{{{E(snapshot.HostVersion)}}}</strong> ({{{E(snapshot.ReleaseChannel)}}})</li><li>Health: {{{E(health.HostStatus)}}}</li><li>Provider health: {{{health.ProviderSummary.Connected}}}/{{{health.ProviderSummary.Enabled}}} enabled connected</li><li>Waveform health: {{{E(health.Waveform?.VisualState ?? "unavailable")}}}</li><li>InfoPanel compatibility: contract {{{snapshot.ContractVersion}}}; plugin version is visible inside InfoPanel when connected</li></ul><p class=error>{{{E(snapshot.ExternalReleaseGate)}}}</p></section>
@@ -147,6 +148,7 @@ public static class UiRenderer
         <section><h2>Source Groups</h2><div class=table-wrap><table><thead><tr><th>Name</th><th>ID</th><th>Availability</th><th>Unresolved</th></tr></thead><tbody>{{{groupRows}}}</tbody></table></div></section>
         <section><h2>Profiles</h2><div class=table-wrap><table><thead><tr><th>Name</th><th>ID</th><th>Revision</th><th>FPS</th></tr></thead><tbody>{{{profileRows}}}</tbody></table><p>Schema {{{ProductCatalogDocument.CurrentSchemaVersion}}}; validation failures {{{health.ProductConfiguration?.ValidationFailureCount ?? 0}}}; save failures {{{health.ProductConfiguration?.SaveFailureCount ?? 0}}}.</p></div></section>
         {{{WaveformCard(health.Waveform)}}}{{{RenderSessionsCard(health.RenderSessions)}}}
+        {{{timing}}}
         <section><h2>InfoPanel Consumers</h2><p>Active consumer leases: {{{health.RenderSessions?.TotalConsumerLeases ?? 0}}}. Session IDs, dimensions, cadence, sequence, frame age, and errors are shown above and in InfoPanel's Auraline diagnostics entries. No additional polling is performed.</p></section>
         <section><h2>Logging</h2><p>Current level: <strong>{{{E(snapshot.LogLevel)}}}</strong>. Debug is temporary and resets to Info when Host restarts. Files roll at 10 MiB with seven retained.</p><form method=post action=/api/v1/diagnostics/log-level><button name=level value=Info>Info</button><button name=level value=Debug>Debug</button></form></section>
         <section><h2>Self-Test</h2>{{{selfTest}}}<form method=post action=/diagnostics/self-test><button>Run Host self-test</button></form><p class=small>The isolated test never uses an active consumer lease or changes saved configuration.</p></section>
@@ -187,6 +189,20 @@ public static class UiRenderer
         var rows = string.Join("", diagnostics.Sessions.Select(session =>
             $"<tr><td><code>{E(session.SessionId)}</code></td><td><code>{E(session.ProfileId)}</code> r{session.ProfileRevision}</td><td>{session.Width}×{session.Height}</td><td>{session.TargetFps}</td><td>{session.ActualFps:F1}</td><td>{session.ConsumerCount}</td><td>{E(session.State)}</td><td>{session.PublishedSequence}</td><td>{session.HotApplyCount}</td><td>{session.AllocationSize}</td></tr>"));
         return $"<section><h2>Render Sessions</h2><p>{diagnostics.ActiveSessionCount} sessions, {diagnostics.TotalConsumerLeases} leases, cap {diagnostics.SessionCap}. Created {diagnostics.SessionCreationCount}; torn down {diagnostics.TeardownCount}; evicted {diagnostics.EvictionCount}; rejected {diagnostics.RejectedSessionCount}; hot-applied {diagnostics.HotApplyCount}.</p><div class=table-wrap><table><thead><tr><th>Session</th><th>Profile</th><th>Size</th><th>Target FPS</th><th>Actual FPS</th><th>Consumers</th><th>State</th><th>Sequence</th><th>Hot applies</th><th>Bytes</th></tr></thead><tbody>{rows}</tbody></table></div></section>";
+    }
+
+    private static string TimingObservability(DiagnosticsSnapshot snapshot)
+    {
+        var gc = snapshot.StallObservability.RuntimeGc;
+        var sessions = snapshot.Health.RenderSessions?.Sessions ?? [];
+        var sessionRows = string.Join("", sessions.Select(session =>
+            $"<tr><td><code>{E(session.SessionId)}</code></td><td>{session.TargetFrameIntervalMs:F3}</td><td>{FormatOptionalDoubleMs(session.LatestSchedulerLatenessMs)}</td><td>{session.MaximumSchedulerLatenessMs:F3} ms</td><td>{FormatOptionalDoubleMs(session.LatestPublicationIntervalMs)}</td><td>{session.MaximumPublicationIntervalMs:F3} ms</td><td>{FormatOptionalDoubleMs(session.LatestRendererDurationMs)}</td><td>{FormatOptionalDoubleMs(session.LatestTransportPublicationDurationMs)}</td></tr>"));
+        var eventRows = string.Join("", snapshot.StallObservability.SignificantEvents.Reverse().Select(item =>
+            $"<tr><td>{E(item.WallClockTimestampUtc.ToString("O"))}</td><td>{E(item.Category)}</td><td>{E(item.SessionId ?? item.StreamId ?? "—")}</td><td>{FormatOptionalDoubleMs(item.DurationMs)}</td><td>{E(item.Reason ?? "—")}</td></tr>"));
+        return $"<section><h2>Timing / Stall Observability</h2><p>Bounded current-run evidence only; monotonic values drive timing math and do not alter scheduling.</p>" +
+               $"<p>GC collections: gen0 {gc.Gen0Collections}, gen1 {gc.Gen1Collections}, gen2 {gc.Gen2Collections}; managed memory {gc.ManagedMemoryBytes} bytes; heap {gc.HeapSizeBytes} bytes; total pause {FormatOptionalDoubleMs(gc.TotalPauseDurationMs)}.</p>" +
+               $"<div class=table-wrap><table><thead><tr><th>Session</th><th>Target interval ms</th><th>Latest lateness</th><th>Max lateness</th><th>Latest publication interval</th><th>Max publication interval</th><th>Renderer</th><th>Publication</th></tr></thead><tbody>{sessionRows}</tbody></table></div>" +
+               $"<p>Significant events: {snapshot.StallObservability.SignificantEvents.Count}/{snapshot.StallObservability.EventCapacity} retained.</p><div class=table-wrap><table><thead><tr><th>UTC</th><th>Category</th><th>Session/stream</th><th>Duration</th><th>Reason</th></tr></thead><tbody>{eventRows}</tbody></table></div></section>";
     }
 
     private static string FormatOptionalDoubleMs(double? value) => value is null ? "—" : $"{value:F1} ms";
